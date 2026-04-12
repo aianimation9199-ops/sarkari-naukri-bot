@@ -3,7 +3,8 @@ import asyncio
 import json
 import re
 import fitz  # PyMuPDF
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from pyrogram import Client, filters, idle
 from pyrogram.types import ReplyKeyboardMarkup, KeyboardButton
 from flask import Flask
@@ -18,22 +19,17 @@ ADMIN_ID = int(os.environ.get("ADMIN_ID", 0))
 CHAT_ID = int(os.environ.get("CHAT_ID", 0))
 TIMER = 30
 
-# --- GEMINI SETUP (Fixed Model Name) ---
-genai.configure(api_key=GEMINI_KEY)
-model = genai.GenerativeModel(
-    model_name='gemini-2.0-flash',  # ✅ Latest stable model
-    generation_config={
-        "temperature": 0.3,
-        "response_mime_type": "application/json"  # Forces JSON output
-    }
-)
+# --- NEW GEMINI SETUP (google-genai package) ---
+client_ai = genai.Client(api_key=GEMINI_KEY)
 
 app = Client("SNA_PRO_V3", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 # Flask Server for Railway
 server = Flask(__name__)
+
 @server.route('/')
-def home(): return "SNA Bot is Healthy! 🚀", 200
+def home():
+    return "SNA Bot is Healthy! 🚀", 200
 
 def run_server():
     port = int(os.environ.get("PORT", 8080))
@@ -55,39 +51,23 @@ def pro_clean_text(text):
 
 # --- ROBUST JSON EXTRACTOR ---
 def extract_json(text):
-    """Try multiple methods to extract valid JSON array from AI response."""
     text = text.strip()
-
-    # Method 1: Direct parse
     try:
         return json.loads(text)
     except:
         pass
-
-    # Method 2: Strip markdown code fences
     try:
         cleaned = re.sub(r'```(?:json)?', '', text).strip().rstrip('`').strip()
         return json.loads(cleaned)
     except:
         pass
-
-    # Method 3: Find first [...] block
     try:
         match = re.search(r'(\[.*\])', text, re.DOTALL)
         if match:
             return json.loads(match.group(1))
     except:
         pass
-
-    # Method 4: Find first {...} and wrap in array
-    try:
-        match = re.search(r'(\{.*\})', text, re.DOTALL)
-        if match:
-            return [json.loads(match.group(1))]
-    except:
-        pass
-
-    raise ValueError(f"No valid JSON found in response: {text[:300]}")
+    raise ValueError(f"JSON nahi mila response mein: {text[:200]}")
 
 # --- VALIDATE QUESTIONS ---
 def validate_questions(questions):
@@ -95,7 +75,6 @@ def validate_questions(questions):
     for q in questions:
         if not isinstance(q, dict):
             continue
-        # Must have question, options, and correct answer
         if not all(k in q for k in ['q', 'o', 'c']):
             continue
         if not isinstance(q['o'], list) or len(q['o']) < 2:
@@ -126,11 +105,9 @@ async def handle_pdf(client, message):
     path = await message.download()
 
     try:
-        # Step 1: Extract text from PDF
+        # Step 1: PDF se text nikalo
         doc = fitz.open(path)
-        pages_text = []
-        for page in doc:
-            pages_text.append(page.get_text())
+        pages_text = [page.get_text() for page in doc]
         doc.close()
         raw_text = " ".join(pages_text)
 
@@ -139,19 +116,18 @@ async def handle_pdf(client, message):
 
         cleaned = pro_clean_text(raw_text)
 
-        # Step 2: Send to Gemini with strict prompt
+        # Step 2: Gemini ko bhejo
         prompt = """You are an expert MCQ creator for Indian government exams.
 
 TASK: Extract exactly 10 MCQs from the given text.
 
 RULES:
-- Each question MUST be bilingual: English first, then Hindi translation
-- Each option MUST be bilingual: English / Hindi
+- Each question MUST be bilingual: English first, then Hindi
+- Each option MUST be bilingual: English / Hindi  
 - correct_option_id is 0-indexed (0=A, 1=B, 2=C, 3=D)
-- Return ONLY a valid JSON array, nothing else
-- No markdown, no explanation, no extra text
+- Return ONLY a valid JSON array, no extra text, no markdown
 
-OUTPUT FORMAT (strictly follow this):
+OUTPUT FORMAT:
 [
   {
     "s": "Subject Name",
@@ -161,24 +137,32 @@ OUTPUT FORMAT (strictly follow this):
   }
 ]
 
-TEXT TO PROCESS:
+TEXT:
 """ + cleaned[:8000]
 
-        response = model.generate_content(prompt)
+        response = client_ai.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.3,
+                response_mime_type="application/json"
+            )
+        )
+
         raw_response = response.text
 
-        # Step 3: Parse JSON robustly
+        # Step 3: JSON parse karo
         questions = extract_json(raw_response)
         questions = validate_questions(questions)
 
         if not questions:
-            raise ValueError("No valid questions after validation")
+            raise ValueError("Koi valid question nahi mila")
 
-        # Step 4: Save to file
+        # Step 4: Save karo
         data = []
         if os.path.exists("quiz_data.json"):
             try:
-                with open("quiz_data.json", "r") as f:
+                with open("quiz_data.json", "r", encoding='utf-8') as f:
                     data = json.load(f)
             except:
                 data = []
@@ -187,12 +171,24 @@ TEXT TO PROCESS:
         with open("quiz_data.json", "w", encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
 
-        await status.edit(f"✅ **Done!** {len(questions)} bilingual sawaal successfully add ho gaye!")
+        await status.edit(f"✅ **Done!** {len(questions)} bilingual sawaal add ho gaye!")
 
     except Exception as e:
-        error_msg = str(e)[:200]
+        error_msg = str(e)
         print(f"[ERROR] {error_msg}")
-        await status.edit(f"❌ **Error:** {error_msg}\n\nKripya dobara try karein.")
+
+        # Quota error ke liye special message
+        if "429" in error_msg or "quota" in error_msg.lower():
+            await status.edit(
+                "❌ **Gemini API Quota Khatam!**\n\n"
+                "Kya karna hai:\n"
+                "1. https://aistudio.google.com par jao\n"
+                "2. Naya API Key banao (free mein milti hai)\n"
+                "3. Railway mein GEMINI_KEY update karo\n\n"
+                "Ya kal try karo — daily limit reset hoti hai."
+            )
+        else:
+            await status.edit(f"❌ Error: {error_msg[:150]}\n\nDobara try karein.")
 
     finally:
         if os.path.exists(path):
