@@ -1,4 +1,3 @@
-```python
 import os
 import asyncio
 import json
@@ -16,77 +15,76 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 GEMINI_KEY = os.environ.get("GEMINI_KEY", "")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", 0))
 CHAT_ID = int(os.environ.get("CHAT_ID", 0))
-TIMER_SECONDS = 30  # Har 30 second mein poll
+TIMER = 30 
 
-# --- AI SETUP ---
+# AI Setup
 genai.configure(api_key=GEMINI_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
 
-app = Client("SNA_Bilingual_Bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+# Bot Client
+app = Client("SNA_FINAL_BOT", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-# --- WEB SERVER ---
-server = Flask('')
+# Flask Server for Railway Health Check
+server = Flask(__name__)
 @server.route('/')
-def home(): return "Sarkari Naukri Academy Bot is Active! 🚀"
+def home(): return "Bot is Online!"
 
 def run_server():
     server.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
 
 # --- DATA STORAGE ---
-def save_questions(new_q):
-    data = []
+def save_q(new_data):
+    current = []
     if os.path.exists("quiz_data.json"):
         try:
-            with open("quiz_data.json", "r") as f: data = json.load(f)
-        except: data = []
-    data.extend(new_q)
-    with open("quiz_data.json", "w") as f: json.dump(data, f)
+            with open("quiz_data.json", "r") as f: current = json.load(f)
+        except: current = []
+    current.extend(new_data)
+    with open("quiz_data.json", "w") as f: json.dump(current, f)
 
-# --- COMMANDS ---
+# --- BOT HANDLERS ---
 @app.on_message(filters.command("start") & filters.private)
-async def start_handler(client, message):
-    keyboard = ReplyKeyboardMarkup([[KeyboardButton("📤 Upload PDF")]], resize_keyboard=True)
-    await message.reply_text(
-        "👋 **Sarkari Naukri Academy** mein aapka swagat hai!\n\n"
-        "Main PDF se **Hindi & English** dono mein sawal bana sakta hoon. 📚✨\n\n"
-        "Niche button par click karke PDF bhejien.",
-        reply_markup=keyboard
-    )
+async def start(client, message):
+    kb = ReplyKeyboardMarkup([[KeyboardButton("📤 Upload PDF")]], resize_keyboard=True)
+    await message.reply_text("👋 **Sarkari Naukri Academy**\n\nBilingual Quiz ke liye niche button dabayein.", reply_markup=kb)
 
 @app.on_message(filters.regex("📤 Upload PDF") & filters.private)
-async def upload_btn(client, message):
-    await message.reply_text("Theek hai! Ab apni **PDF file** bhejien. Main use scan karke bilingual quiz bana dunga. 📄⬇️")
+async def ask_pdf(client, message):
+    await message.reply_text("📄 Ab apni PDF bhejien. Main scan karke Hindi/English polls bana dunga.")
 
-# --- PDF & BILINGUAL AI PROCESSING ---
 @app.on_message(filters.document & filters.user(ADMIN_ID) & filters.private)
 async def handle_pdf(client, message):
-    if not message.document.mime_type == "application/pdf":
-        return await message.reply_text("❌ Kripya sirf PDF file bhejien.")
-    
-    status = await message.reply_text("📥 PDF mil gayi! AI ab Hindi aur English mein sawal bana raha hai... ⏳")
+    status = await message.reply_text("🔎 PDF Reading... AI Bilingual MCQs bana raha hai. ⏳")
     path = await message.download()
     
     try:
-        text = ""
-        with fitz.open(path) as doc:
-            for page in doc: text += page.get_text()
+        doc = fitz.open(path)
+        text = "".join([page.get_text() for page in doc])
+        doc.close()
         
-        # Power Prompt for Bilingual + Emojis
         prompt = (
-            "You are a professional exam content creator. Extract 25 high-quality MCQs from the text. "
-            "IMPORTANT: Every question and every option MUST be in both English and Hindi. "
-            "Example Question: 'What is the capital of India? / भारत की राजधानी क्या है? 🇮🇳' "
-            "Use relevant emojis for each subject. "
-            "Return ONLY a clean JSON list: "
-            "[{\"s\": \"Subject 📚\", \"q\": \"English Q? / Hindi Q? ❓\", \"o\": [\"Eng / Hin\", \"Eng / Hin\", \"Eng / Hin\", \"Eng / Hin\"], \"c\": 0}]. "
-            "Rule: 'c' is correct option index (0-3). No other text."
-            f"\n\nText: {text[:9000]}"
+            "Extract 25 high-quality Railway MCQs. "
+            "Questions and Options MUST be Bilingual (English / Hindi). "
+            "Example: 'Capital of India? / भारत की राजधानी?'. "
+            "Return ONLY JSON list: [{\"s\": \"Sub 📚\", \"q\": \"Q? / स?❓\", \"o\": [\"A/अ\", \"B/ब\", \"C/स\", \"D/द\"], \"c\": 0}]. "
+            f"Text: {text[:8000]}"
         )
         
         response = model.generate_content(prompt)
         res_text = response.text.strip()
-        
-        # Clean JSON string
         if "
+http://googleusercontent.com/immersive_entry_chip/0
+http://googleusercontent.com/immersive_entry_chip/1
 
-```
+### Step 3: `quiz_data.json` ko saaf karein
+GitHub mein is file ko kholiye aur sab kuch delete karke sirf `[]` likh kar save kar dein.
+
+---
+
+### Ab kya hoga?
+1.  Jaise hi aap GitHub par save karenge, Railway deploy karega. Is baar ye crash nahi hoga kyunki humne `asyncio.create_task` aur `Thread` ka sahi combination use kiya hai.
+2.  Deploy hone ke baad Telegram par `/start` likhiye.
+3.  **"📤 Upload PDF"** button dabaiye aur apni PDF bhej dijiye.
+4.  Bot **"Success"** bolega aur thik **30 second** baad aapke group mein **Bilingual (Hindi/English)** poll aa jayega.
+
+Ise commit karke dekhiye, aapka bot ab ekdum "Sarkari Naukri Academy" ka asli champion ban jayega! 🚀
