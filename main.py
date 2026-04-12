@@ -15,46 +15,50 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 GEMINI_KEY = os.environ.get("GEMINI_KEY", "")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", 0))
 CHAT_ID = int(os.environ.get("CHAT_ID", 0))
-TIMER = 30 
+TIMER = 30  # Har 30 second mein poll
 
-# AI Setup
+# --- AI & BOT SETUP ---
 genai.configure(api_key=GEMINI_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
+app = Client("SNA_FINAL_V2", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-# Bot Client
-app = Client("SNA_FINAL_BOT", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
-
-# Flask Server for Railway Health Check
+# --- FLASK SERVER (Health Check for Railway) ---
 server = Flask(__name__)
 @server.route('/')
-def home(): return "Bot is Online!"
+def home(): return "Sarkari Naukri Academy Bot is Online! 🚀"
 
 def run_server():
     server.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
 
-# --- DATA STORAGE ---
-def save_q(new_data):
-    current = []
+# --- DATA HELPERS ---
+def save_data(new_qs):
+    data = []
     if os.path.exists("quiz_data.json"):
         try:
-            with open("quiz_data.json", "r") as f: current = json.load(f)
-        except: current = []
-    current.extend(new_data)
-    with open("quiz_data.json", "w") as f: json.dump(current, f)
+            with open("quiz_data.json", "r") as f: data = json.load(f)
+        except: data = []
+    data.extend(new_qs)
+    with open("quiz_data.json", "w") as f: json.dump(data, f)
 
 # --- BOT HANDLERS ---
 @app.on_message(filters.command("start") & filters.private)
-async def start(client, message):
+async def start_handler(client, message):
     kb = ReplyKeyboardMarkup([[KeyboardButton("📤 Upload PDF")]], resize_keyboard=True)
-    await message.reply_text("👋 **Sarkari Naukri Academy**\n\nBilingual Quiz ke liye niche button dabayein.", reply_markup=kb)
+    await message.reply_text(
+        "👋 **Sarkari Naukri Academy**\n\nBilingual Quiz (Hindi/English) polls shuru karne ke liye niche button dabayein.", 
+        reply_markup=kb
+    )
 
 @app.on_message(filters.regex("📤 Upload PDF") & filters.private)
-async def ask_pdf(client, message):
-    await message.reply_text("📄 Ab apni PDF bhejien. Main scan karke Hindi/English polls bana dunga.")
+async def ask_pdf_handler(client, message):
+    await message.reply_text("📄 Ab apni PDF file bhejien. Main use scan karke polls bana dunga.")
 
 @app.on_message(filters.document & filters.user(ADMIN_ID) & filters.private)
-async def handle_pdf(client, message):
-    status = await message.reply_text("🔎 PDF Reading... AI Bilingual MCQs bana raha hai. ⏳")
+async def pdf_handler(client, message):
+    if not message.document.mime_type == "application/pdf":
+        return await message.reply_text("❌ Kripya sirf PDF file bhejien.")
+    
+    status = await message.reply_text("🔎 PDF Scan ho rahi hai... AI Bilingual sawal bana raha hai. ⏳")
     path = await message.download()
     
     try:
@@ -63,28 +67,70 @@ async def handle_pdf(client, message):
         doc.close()
         
         prompt = (
-            "Extract 25 high-quality Railway MCQs. "
+            "Extract 20 high-quality MCQs. "
             "Questions and Options MUST be Bilingual (English / Hindi). "
-            "Example: 'Capital of India? / भारत की राजधानी?'. "
-            "Return ONLY JSON list: [{\"s\": \"Sub 📚\", \"q\": \"Q? / स?❓\", \"o\": [\"A/अ\", \"B/ब\", \"C/स\", \"D/द\"], \"c\": 0}]. "
-            f"Text: {text[:8000]}"
+            "Add relevant emojis. Return ONLY a clean JSON list: "
+            "[{\"s\": \"Subject 📚\", \"q\": \"English Q? / Hindi Q? ❓\", \"o\": [\"A/अ\", \"B/ब\", \"C/स\", \"D/द\"], \"c\": 0}]. "
+            "Rule: 'c' is correct index (0-3). No other text."
+            f"\n\nText: {text[:8000]}"
         )
         
         response = model.generate_content(prompt)
         res_text = response.text.strip()
-        if "
-http://googleusercontent.com/immersive_entry_chip/0
-http://googleusercontent.com/immersive_entry_chip/1
+        
+        # JSON Cleaning
+        if "```json" in res_text:
+            res_text = res_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in res_text:
+            res_text = res_text.split("```")[1].split("```")[0].strip()
+            
+        new_items = json.loads(res_text)
+        save_data(new_items)
+        await status.edit(f"✅ Success! {len(new_items)} sawal add ho gaye hain.")
+        
+    except Exception as e:
+        print(f"Error: {e}")
+        await status.edit("❌ Error: AI format samajh nahi paya. Ek baar phir try karein.")
+    
+    if os.path.exists(path): os.remove(path)
 
-### Step 3: `quiz_data.json` ko saaf karein
-GitHub mein is file ko kholiye aur sab kuch delete karke sirf `[]` likh kar save kar dein.
+# --- POLL SENDER LOOP ---
+async def poll_loop():
+    idx = 0
+    while True:
+        try:
+            if os.path.exists("quiz_data.json"):
+                with open("quiz_data.json", "r") as f: data = json.load(f)
+                if data:
+                    if idx >= len(data): idx = 0
+                    q = data[idx]
+                    await app.send_poll(
+                        CHAT_ID, 
+                        f"📖 {q.get('s', 'GK')}\n\n{q['q']}", 
+                        q['o'], 
+                        is_anonymous=False, 
+                        type="quiz", 
+                        correct_option_id=q['c']
+                    )
+                    idx += 1
+        except Exception as e:
+            print(f"Poll Loop Error: {e}")
+        await asyncio.sleep(TIMER)
 
----
+# --- MAIN EXECUTION ---
+async def start_bot():
+    # Start Flask in background
+    t = Thread(target=run_server, daemon=True)
+    t.start()
+    
+    # Start Bot
+    await app.start()
+    print("🤖 Bot is Online!")
+    
+    # Run Poll Loop
+    asyncio.create_task(poll_loop())
+    await idle()
 
-### Ab kya hoga?
-1.  Jaise hi aap GitHub par save karenge, Railway deploy karega. Is baar ye crash nahi hoga kyunki humne `asyncio.create_task` aur `Thread` ka sahi combination use kiya hai.
-2.  Deploy hone ke baad Telegram par `/start` likhiye.
-3.  **"📤 Upload PDF"** button dabaiye aur apni PDF bhej dijiye.
-4.  Bot **"Success"** bolega aur thik **30 second** baad aapke group mein **Bilingual (Hindi/English)** poll aa jayega.
-
-Ise commit karke dekhiye, aapka bot ab ekdum "Sarkari Naukri Academy" ka asli champion ban jayega! 🚀
+if __name__ == "__main__":
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(start_bot())
