@@ -21,7 +21,7 @@ TIMER = 30
 # --- GEMINI SETUP (Fixed Model Name) ---
 genai.configure(api_key=GEMINI_KEY)
 model = genai.GenerativeModel(
-    model_name='gemini-1.5-flash',  # ✅ Stable, working model
+    model_name='gemini-2.0-flash',  # ✅ Latest stable model
     generation_config={
         "temperature": 0.3,
         "response_mime_type": "application/json"  # Forces JSON output
