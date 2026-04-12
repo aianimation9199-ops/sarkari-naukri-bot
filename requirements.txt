@@ -1,5 +1,5 @@
 pyrogram==2.0.106
 TgCrypto
 PyMuPDF
-google-genai
+groq
 flask
