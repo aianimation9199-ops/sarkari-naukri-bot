@@ -1,9 +1,11 @@
+```python
 import os
 import asyncio
 import json
 import fitz  # PyMuPDF
 import google.generativeai as genai
-from pyrogram import Client, filters
+from pyrogram import Client, filters, idle
+from pyrogram.types import ReplyKeyboardMarkup, KeyboardButton
 from flask import Flask
 from threading import Thread
 
@@ -14,93 +16,77 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 GEMINI_KEY = os.environ.get("GEMINI_KEY", "")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", 0))
 CHAT_ID = int(os.environ.get("CHAT_ID", 0))
-TIMER = 30  # Har 30 second mein poll (Ise aap badal sakte hain)
+TIMER_SECONDS = 30  # Har 30 second mein poll
 
 # --- AI SETUP ---
 genai.configure(api_key=GEMINI_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
-app = Client("SNA_Quiz_Bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-# --- WEB SERVER FOR RAILWAY ---
+app = Client("SNA_Bilingual_Bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+
+# --- WEB SERVER ---
 server = Flask('')
 @server.route('/')
-def home(): return "Sarkari Naukri Academy Bot is Live!"
+def home(): return "Sarkari Naukri Academy Bot is Active! 🚀"
 
 def run_server():
     server.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
 
-# --- PDF TO SUBJECT-WISE MCQs ---
-@app.on_message(filters.document & filters.user(ADMIN_ID))
-async def process_pdf(client, message):
-    if message.document.mime_type == "application/pdf":
-        status = await message.reply_text("🔎 PDF Scan ho rahi hai... AI important questions nikal raha hai.")
-        path = await message.download()
-        
+# --- DATA STORAGE ---
+def save_questions(new_q):
+    data = []
+    if os.path.exists("quiz_data.json"):
+        try:
+            with open("quiz_data.json", "r") as f: data = json.load(f)
+        except: data = []
+    data.extend(new_q)
+    with open("quiz_data.json", "w") as f: json.dump(data, f)
+
+# --- COMMANDS ---
+@app.on_message(filters.command("start") & filters.private)
+async def start_handler(client, message):
+    keyboard = ReplyKeyboardMarkup([[KeyboardButton("📤 Upload PDF")]], resize_keyboard=True)
+    await message.reply_text(
+        "👋 **Sarkari Naukri Academy** mein aapka swagat hai!\n\n"
+        "Main PDF se **Hindi & English** dono mein sawal bana sakta hoon. 📚✨\n\n"
+        "Niche button par click karke PDF bhejien.",
+        reply_markup=keyboard
+    )
+
+@app.on_message(filters.regex("📤 Upload PDF") & filters.private)
+async def upload_btn(client, message):
+    await message.reply_text("Theek hai! Ab apni **PDF file** bhejien. Main use scan karke bilingual quiz bana dunga. 📄⬇️")
+
+# --- PDF & BILINGUAL AI PROCESSING ---
+@app.on_message(filters.document & filters.user(ADMIN_ID) & filters.private)
+async def handle_pdf(client, message):
+    if not message.document.mime_type == "application/pdf":
+        return await message.reply_text("❌ Kripya sirf PDF file bhejien.")
+    
+    status = await message.reply_text("📥 PDF mil gayi! AI ab Hindi aur English mein sawal bana raha hai... ⏳")
+    path = await message.download()
+    
+    try:
         text = ""
         with fitz.open(path) as doc:
             for page in doc: text += page.get_text()
         
+        # Power Prompt for Bilingual + Emojis
         prompt = (
-            "Extract top 50 Railway/SSC MCQs from this text. "
-            "Categorize each by subject. Return ONLY a valid JSON list like this: "
-            "[{\"s\": \"History\", \"q\": \"Question?\", \"o\": [\"A\", \"B\", \"C\", \"D\"], \"c\": 0}]. "
-            f"Text: {text[:10000]}"
+            "You are a professional exam content creator. Extract 25 high-quality MCQs from the text. "
+            "IMPORTANT: Every question and every option MUST be in both English and Hindi. "
+            "Example Question: 'What is the capital of India? / भारत की राजधानी क्या है? 🇮🇳' "
+            "Use relevant emojis for each subject. "
+            "Return ONLY a clean JSON list: "
+            "[{\"s\": \"Subject 📚\", \"q\": \"English Q? / Hindi Q? ❓\", \"o\": [\"Eng / Hin\", \"Eng / Hin\", \"Eng / Hin\", \"Eng / Hin\"], \"c\": 0}]. "
+            "Rule: 'c' is correct option index (0-3). No other text."
+            f"\n\nText: {text[:9000]}"
         )
         
-        try:
-            response = model.generate_content(prompt)
-            clean_json = response.text[response.text.find("["):response.text.rfind("]")+1]
-            new_questions = json.loads(clean_json)
-            
-            data = []
-            if os.path.exists("quiz_data.json"):
-                with open("quiz_data.json", "r") as f: data = json.load(f)
-            
-            data.extend(new_questions)
-            with open("quiz_data.json", "w") as f: json.dump(data, f)
-            
-            await status.edit(f"✅ Success! {len(new_questions)} sawal subject-wise add ho gaye hain.")
-        except Exception as e:
-            await status.edit(f"❌ Error: AI format samajh nahi paya. Fir se try karein.")
+        response = model.generate_content(prompt)
+        res_text = response.text.strip()
         
-        if os.path.exists(path): os.remove(path)
+        # Clean JSON string
+        if "
 
-# --- AUTOMATIC SEQUENTIAL POLL TIMER ---
-async def start_quiz_loop():
-    current_pos = 0
-    while True:
-        try:
-            if os.path.exists("quiz_data.json"):
-                with open("quiz_data.json", "r") as f:
-                    data = json.load(f)
-                
-                if data:
-                    if current_pos >= len(data): current_pos = 0 # Loop restart
-                    
-                    q = data[current_pos]
-                    subject = q.get("s", "General Knowledge")
-                    
-                    await app.send_poll(
-                        chat_id=CHAT_ID,
-                        question=f"📚 Subject: {subject}\n\n{q['q']}",
-                        options=q['o'],
-                        is_anonymous=False,
-                        type="quiz",
-                        correct_option_id=q['c']
-                    )
-                    current_pos += 1
-        except Exception as e:
-            print(f"Loop Error: {e}")
-        
-        await asyncio.sleep(TIMER)
-
-# --- START BOT ---
-async def main():
-    Thread(target=run_server).start()
-    await app.start()
-    print("🤖 Bot is Online!")
-    await start_quiz_loop()
-
-if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
+```
