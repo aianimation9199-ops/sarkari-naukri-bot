@@ -1,6 +1,7 @@
 import os
 import asyncio
 import json
+import re
 import fitz  # PyMuPDF
 import google.generativeai as genai
 from pyrogram import Client, filters, idle
@@ -15,86 +16,78 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 GEMINI_KEY = os.environ.get("GEMINI_KEY", "")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", 0))
 CHAT_ID = int(os.environ.get("CHAT_ID", 0))
-TIMER = 30  # Har 30 second mein poll
+TIMER = 30 
 
-# --- AI & BOT SETUP ---
+# AI Setup
 genai.configure(api_key=GEMINI_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
-app = Client("SNA_FINAL_V2", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+model = genai.GenerativeModel(
+    model_name='gemini-1.5-flash',
+    generation_config={"response_mime_type": "application/json"}
+)
+app = Client("SNA_HEALTH_FIX", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-# --- FLASK SERVER (Health Check for Railway) ---
+# --- FLASK SERVER (For Railway Health Check) ---
 server = Flask(__name__)
+
 @server.route('/')
-def home(): return "Sarkari Naukri Academy Bot is Online! 🚀"
+def health_check():
+    # Railway ko 'OK' signal bhejne ke liye
+    return "Bot is healthy and running!", 200
 
 def run_server():
-    server.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
+    # Railway's dynamic port use karein
+    port = int(os.environ.get("PORT", 8080))
+    server.run(host='0.0.0.0', port=port)
 
-# --- DATA HELPERS ---
-def save_data(new_qs):
-    data = []
-    if os.path.exists("quiz_data.json"):
-        try:
-            with open("quiz_data.json", "r") as f: data = json.load(f)
-        except: data = []
-    data.extend(new_qs)
-    with open("quiz_data.json", "w") as f: json.dump(data, f)
+# --- LOGIC & HANDLERS ---
+def clean_text(text):
+    text = re.sub(r'http\S+|www\S+|@\S+', '', text)
+    patterns = [r'GK Trick By Nitin Gupta', r'Google Play Store', r'Nitin-Gupta.com']
+    for p in patterns: text = re.sub(p, '', text, flags=re.IGNORECASE)
+    return text.strip()
 
-# --- BOT HANDLERS ---
 @app.on_message(filters.command("start") & filters.private)
-async def start_handler(client, message):
+async def start(client, message):
     kb = ReplyKeyboardMarkup([[KeyboardButton("📤 Upload PDF")]], resize_keyboard=True)
-    await message.reply_text(
-        "👋 **Sarkari Naukri Academy**\n\nBilingual Quiz (Hindi/English) polls shuru karne ke liye niche button dabayein.", 
-        reply_markup=kb
-    )
+    await message.reply_text("👋 **SNA Bot Active!**\nBilingual polls ke liye niche button dabayein.", reply_markup=kb)
 
 @app.on_message(filters.regex("📤 Upload PDF") & filters.private)
-async def ask_pdf_handler(client, message):
-    await message.reply_text("📄 Ab apni PDF file bhejien. Main use scan karke polls bana dunga.")
+async def instruct(client, message):
+    await message.reply_text("📄 Ab apni PDF bhejien.")
 
 @app.on_message(filters.document & filters.user(ADMIN_ID) & filters.private)
-async def pdf_handler(client, message):
-    if not message.document.mime_type == "application/pdf":
-        return await message.reply_text("❌ Kripya sirf PDF file bhejien.")
-    
-    status = await message.reply_text("🔎 PDF Scan ho rahi hai... AI Bilingual sawal bana raha hai. ⏳")
+async def handle_pdf(client, message):
+    status = await message.reply_text("📥 Scanning PDF...")
     path = await message.download()
-    
     try:
         doc = fitz.open(path)
-        text = "".join([page.get_text() for page in doc])
+        raw_text = "".join([page.get_text() for page in doc])
         doc.close()
         
+        cleaned = clean_text(raw_text)
         prompt = (
-            "Extract 20 high-quality MCQs. "
-            "Questions and Options MUST be Bilingual (English / Hindi). "
-            "Add relevant emojis. Return ONLY a clean JSON list: "
-            "[{\"s\": \"Subject 📚\", \"q\": \"English Q? / Hindi Q? ❓\", \"o\": [\"A/अ\", \"B/ब\", \"C/स\", \"D/द\"], \"c\": 0}]. "
-            "Rule: 'c' is correct index (0-3). No other text."
-            f"\n\nText: {text[:8000]}"
+            "Extract 25 high-quality MCQs. Both Q and Options must be English / Hindi. "
+            "JSON Format: [{\"s\": \"Sub 📚\", \"q\": \"Eng Q / हिंदी स ❓\", \"o\": [\"A/अ\", \"B/ब\", \"C/स\", \"D/द\"], \"c\": 0}]."
+            f"\n\nText: {cleaned[:9000]}"
         )
         
         response = model.generate_content(prompt)
-        res_text = response.text.strip()
+        new_qs = json.loads(response.text)
         
-        # JSON Cleaning
-        if "```json" in res_text:
-            res_text = res_text.split("```json")[1].split("```")[0].strip()
-        elif "```" in res_text:
-            res_text = res_text.split("```")[1].split("```")[0].strip()
-            
-        new_items = json.loads(res_text)
-        save_data(new_items)
-        await status.edit(f"✅ Success! {len(new_items)} sawal add ho gaye hain.")
+        data = []
+        if os.path.exists("quiz_data.json"):
+            try:
+                with open("quiz_data.json", "r") as f: data = json.load(f)
+            except: data = []
+        data.extend(new_qs)
+        with open("quiz_data.json", "w") as f: json.dump(data, f)
         
+        await status.edit(f"✅ Success! {len(new_qs)} questions added.")
     except Exception as e:
-        print(f"Error: {e}")
-        await status.edit("❌ Error: AI format samajh nahi paya. Ek baar phir try karein.")
-    
+        await status.edit(f"❌ Error: AI format issue.")
     if os.path.exists(path): os.remove(path)
 
-# --- POLL SENDER LOOP ---
+# --- AUTOMATIC POLL SENDER ---
 async def poll_loop():
     idx = 0
     while True:
@@ -104,33 +97,25 @@ async def poll_loop():
                 if data:
                     if idx >= len(data): idx = 0
                     q = data[idx]
-                    await app.send_poll(
-                        CHAT_ID, 
-                        f"📖 {q.get('s', 'GK')}\n\n{q['q']}", 
-                        q['o'], 
-                        is_anonymous=False, 
-                        type="quiz", 
-                        correct_option_id=q['c']
-                    )
+                    await app.send_poll(CHAT_ID, f"📖 {q['s']}\n\n{q['q']}", q['o'], is_anonymous=False, type="quiz", correct_option_id=q['c'])
                     idx += 1
-        except Exception as e:
-            print(f"Poll Loop Error: {e}")
+        except: pass
         await asyncio.sleep(TIMER)
 
-# --- MAIN EXECUTION ---
-async def start_bot():
-    # Start Flask in background
+# --- STARTUP SEQUENCE ---
+async def main():
+    # 1. Sabse pehle Server chalu karein (Health Check Pass karne ke liye)
     t = Thread(target=run_server, daemon=True)
     t.start()
     
-    # Start Bot
+    # 2. Bot ko start karein
     await app.start()
     print("🤖 Bot is Online!")
     
-    # Run Poll Loop
+    # 3. Poll loop chalu karein
     asyncio.create_task(poll_loop())
     await idle()
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(start_bot())
+    loop.run_until_complete(main())
