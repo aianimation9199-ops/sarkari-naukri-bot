@@ -2,28 +2,24 @@ import os
 import asyncio
 import json
 import re
-import fitz  # PyMuPDF
-from google import genai
-from google.genai import types
+import fitz
+from groq import Groq
 from pyrogram import Client, filters, idle
 from pyrogram.types import ReplyKeyboardMarkup, KeyboardButton
 from flask import Flask
 from threading import Thread
 
-# --- CONFIGURATION ---
 API_ID = int(os.environ.get("API_ID", 0))
 API_HASH = os.environ.get("API_HASH", "")
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
-GEMINI_KEY = os.environ.get("GEMINI_KEY", "")
+GROQ_KEY = os.environ.get("GROQ_KEY", "")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", 0))
 CHAT_ID = int(os.environ.get("CHAT_ID", 0))
 TIMER = 30
 
-# --- NEW GEMINI SETUP ---
-client_ai = genai.Client(api_key=GEMINI_KEY)
+groq_client = Groq(api_key=GROQ_KEY)
 
 app = Client("SNA_PRO_V3", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
-
 server = Flask(__name__)
 
 @server.route('/')
@@ -39,8 +35,8 @@ def pro_clean_text(text):
     junk = ['GK Trick By Nitin Gupta', 'Ultimate Key to Success', 'Google Play Store',
             'Nitin-Gupta.com', 'Test Series', 'High-Quality PDF Notes', 'Online Course',
             'Daily Monthly Yearly', 'Download our App', 'YouTube', 'Telegram', 'Instagram']
-    for pattern in junk:
-        text = re.sub(pattern, '', text, flags=re.IGNORECASE)
+    for p in junk:
+        text = re.sub(p, '', text, flags=re.IGNORECASE)
     text = re.sub(r'\n+', ' ', text)
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
@@ -67,14 +63,10 @@ def extract_json(text):
 def validate_questions(questions):
     valid = []
     for q in questions:
-        if not isinstance(q, dict):
-            continue
-        if not all(k in q for k in ['q', 'o', 'c']):
-            continue
-        if not isinstance(q['o'], list) or len(q['o']) < 2:
-            continue
-        if not isinstance(q['c'], int) or q['c'] >= len(q['o']):
-            continue
+        if not isinstance(q, dict): continue
+        if not all(k in q for k in ['q', 'o', 'c']): continue
+        if not isinstance(q['o'], list) or len(q['o']) < 2: continue
+        if not isinstance(q['c'], int) or q['c'] >= len(q['o']): continue
         valid.append(q)
     return valid
 
@@ -92,14 +84,13 @@ async def handle_pdf(client, message):
     if message.document.mime_type != "application/pdf":
         return await message.reply_text("❌ Kripya sirf PDF bhejien.")
 
-    status = await message.reply_text("⏳ PDF process ho rahi hai... thoda wait karein.")
+    status = await message.reply_text("⏳ PDF process ho rahi hai... wait karein.")
     path = await message.download()
 
     try:
         doc = fitz.open(path)
-        pages_text = [page.get_text() for page in doc]
+        raw_text = " ".join([page.get_text() for page in doc])
         doc.close()
-        raw_text = " ".join(pages_text)
 
         if len(raw_text.strip()) < 100:
             return await status.edit("❌ PDF mein readable text nahi mila.")
@@ -107,29 +98,27 @@ async def handle_pdf(client, message):
         cleaned = pro_clean_text(raw_text)
 
         prompt = """You are an expert MCQ creator for Indian government exams.
-TASK: Extract exactly 10 MCQs from the given text.
+Extract exactly 10 MCQs from the given text.
 RULES:
 - Each question MUST be bilingual: English first, then Hindi
 - Each option MUST be bilingual: English / Hindi
 - correct_option_id is 0-indexed (0=A, 1=B, 2=C, 3=D)
 - Return ONLY a valid JSON array, no extra text, no markdown
 
-OUTPUT FORMAT:
+FORMAT:
 [{"s": "Subject", "q": "English? / हिंदी?", "o": ["A/अ", "B/ब", "C/स", "D/द"], "c": 0}]
 
 TEXT:
-""" + cleaned[:8000]
+""" + cleaned[:6000]
 
-        response = client_ai.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.3,
-                response_mime_type="application/json"
-            )
+        response = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3
         )
 
-        questions = extract_json(response.text)
+        raw = response.choices[0].message.content
+        questions = extract_json(raw)
         questions = validate_questions(questions)
 
         if not questions:
@@ -150,18 +139,7 @@ TEXT:
         await status.edit(f"✅ **Done!** {len(questions)} bilingual sawaal add ho gaye!")
 
     except Exception as e:
-        error_msg = str(e)
-        print(f"[ERROR] {error_msg}")
-        if False:  # disabled - show real error always
-            await status.edit(
-                "❌ **Gemini API Quota Khatam!**\n\n"
-                "Fix karo:\n"
-                "1. https://aistudio.google.com jao\n"
-                "2. Naya free API Key banao\n"
-                "3. Railway mein GEMINI_KEY update karo"
-            )
-        else:
-            await status.edit(f"❌ Error:\n{error_msg[:500]}")
+        await status.edit(f"❌ Error:\n{str(e)[:400]}")
 
     finally:
         if os.path.exists(path):
@@ -175,8 +153,7 @@ async def poll_loop():
                 with open("quiz_data.json", "r", encoding='utf-8') as f:
                     data = json.load(f)
                 if data:
-                    if idx >= len(data):
-                        idx = 0
+                    if idx >= len(data): idx = 0
                     q = data[idx]
                     await app.send_poll(
                         CHAT_ID,
