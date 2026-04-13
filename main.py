@@ -12,7 +12,7 @@ from pyrogram.types import ReplyKeyboardMarkup, KeyboardButton
 from flask import Flask
 from threading import Thread
 
-# --- CONFIGURATION ---
+# --- CONFIGURATION (Railway Variables) ---
 API_ID = int(os.environ.get("API_ID", 0))
 API_HASH = os.environ.get("API_HASH", "")
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
@@ -23,12 +23,12 @@ TIMER = int(os.environ.get("TIMER", 60))
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 GIST_ID = os.environ.get("GIST_ID", "")
 
-# Clients
+# Clients Setup
 client_ai = Groq(api_key=GROQ_API_KEY)
-app = Client("SNA_ULTIMATE_PRO", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+app = Client("SNA_PRO_FINAL", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 server = Flask(__name__)
 
-# Global State
+# Global States
 IS_RUNNING = True
 IS_MEGA_TEST = False
 WAITING_TEXT = {}
@@ -64,12 +64,10 @@ async def gist_op(action, data=None):
 # ========== ACCURACY & BILINGUAL EXTRACTION ==========
 async def groq_extract_bilingual(text):
     prompt = (
-        "Extract 20 high-quality MCQs from the text. "
-        "Every Question and Option MUST be Bilingual (English / Hindi). "
-        "Find the correct answer exactly from 'Ans - (A/B/C/D)' or 'Uttar:' in text. "
-        "Return ONLY a JSON list: "
-        "[{\"q\": \"Q? / स?❓\", \"o\": [\"Opt1\", \"Opt2\", \"Opt3\", \"Opt4\"], \"ans_txt\": \"Exact correct option text\"}].\n\n"
-        f"Text: {text[:9500]}"
+        "Extract exactly 20 MCQs from the text. Every Q and Option MUST be Bilingual (English / Hindi). "
+        "Find the correct answer from 'Ans - (A/B/C/D)' or 'Uttar:' in the text. "
+        "Return ONLY a JSON list: [{\"q\": \"Q / स?\", \"o\": [\"A\", \"B\", \"C\", \"D\"], \"ans_txt\": \"Correct Text\"}]."
+        f"\n\nText: {text[:9000]}"
     )
     try:
         r = client_ai.chat.completions.create(
@@ -79,53 +77,39 @@ async def groq_extract_bilingual(text):
         )
         res = json.loads(r.choices[0].message.content)
         raw_qs = res.get("questions", res) if isinstance(res, dict) else res
-        
         final_qs = []
         for item in raw_qs:
-            opts = item['o']
-            ans_text = item['ans_txt']
-            c_idx = 0
+            opts, ans_text, c_idx = item['o'], item['ans_txt'], 0
             for i, o in enumerate(opts):
                 if ans_text in o or o in ans_text:
-                    c_idx = i
-                    break
+                    c_idx = i; break
             final_qs.append({"q": item['q'], "o": opts, "c": c_idx})
         return final_qs
     except: return []
 
-# ========== WINNER & LEADERBOARD (1/3 Negative) ==========
+# ========== RESULT SYSTEM (1/3 Negative Marking) ==========
 async def publish_results():
     global IS_MEGA_TEST, USER_SCORES, TEST_POLLS
     if not USER_SCORES:
-        await app.send_message(CHAT_ID, "📊 **Update:** Aaj kisi ne test nahi diya.")
+        await app.send_message(CHAT_ID, "📊 Aaj kisi ne test nahi diya.")
     else:
         results = []
         for uid, s in USER_SCORES.items():
-            # 1/3 Negative Marking logic
             score = s['c'] - (s['w'] * 0.33)
             total = s['c'] + s['w']
             perc = (s['c'] / total * 100) if total > 0 else 0
             results.append({"name": s['n'], "score": round(score, 2), "perc": round(perc, 1), "c": s['c'], "w": s['w']})
         
         results = sorted(results, key=lambda x: x['score'], reverse=True)[:10]
-        
-        msg = "🏆 **SNA MEGA TEST FINAL RESULT** 🏆\n"
-        msg += "━━━━━━━━━━━━━━━━━━━━\n\n"
+        msg = "🏆 **SNA MEGA TEST RESULT** 🏆\n━━━━━━━━━━━━━━━\n\n"
         for i, r in enumerate(results, 1):
             medal = "🥇" if i==1 else "🥈" if i==2 else "🥉" if i==3 else "🔹"
-            msg += f"{medal} **Rank {i}:** {r['name']}\n"
-            msg += f"   ┗ Marks: **{r['score']}** | Sahi: {r['c']} | Galat: {r['w']}\n"
-            msg += f"   ┗ Accuracy: {r['perc']}%\n\n"
+            msg += f"{medal} Rank {i}: {r['name']}\n Marks: {r['score']} | Accuracy: {r['perc']}%\n\n"
         
         winner = results[0]['name']
-        msg += f"✨ **Winner: {winner}!** ✨\n"
-        msg += "━━━━━━━━━━━━━━━━━━━━\n"
-        msg += "🎉 Welcome to my group! **और अच्छा से मेहनत करो और Government Job पाओ!** 👮‍♂️🔥\n"
+        msg += f"✨ **Winner: {winner}!** ✨\n━━━━━━━━━━━━━━━\n🎉 और अच्छा से मेहनत करो और Government Job पाओ! 👮‍♂️🔥"
         await app.send_message(CHAT_ID, msg)
-
-    IS_MEGA_TEST = False
-    USER_SCORES = {}
-    TEST_POLLS = {}
+    IS_MEGA_TEST, USER_SCORES, TEST_POLLS = False, {}, {}
 
 @app.on_poll_answer()
 async def poll_ans(client, poll_answer):
@@ -133,21 +117,18 @@ async def poll_ans(client, poll_answer):
     pid = poll_answer.poll_id
     if pid not in TEST_POLLS: return
     uid = poll_answer.user.id
-    if uid not in USER_SCORES:
-        USER_SCORES[uid] = {"c": 0, "w": 0, "n": poll_answer.user.first_name}
-    if poll_answer.option_ids[0] == TEST_POLLS[pid]:
-        USER_SCORES[uid]["c"] += 1
-    else:
-        USER_SCORES[uid]["w"] += 1
+    if uid not in USER_SCORES: USER_SCORES[uid] = {"c": 0, "w": 0, "n": poll_answer.user.first_name}
+    if poll_answer.option_ids[0] == TEST_POLLS[pid]: USER_SCORES[uid]["c"] += 1
+    else: USER_SCORES[uid]["w"] += 1
 
-# ========== SCHEDULER (9, 12, 3, 5) ==========
+# ========== SCHEDULER ==========
 async def mega_test_timer():
     while True:
         now = datetime.now().strftime("%H:%M")
         if now in ["09:00", "12:00", "15:00", "17:00"]:
             global IS_MEGA_TEST, IS_RUNNING
             IS_MEGA_TEST, IS_RUNNING = True, False
-            await app.send_message(CHAT_ID, f"🚨 **MEGA TEST START ({now})** 🚨\n100 Questions | Bilingual | Negative 1/3 Active.")
+            await app.send_message(CHAT_ID, f"🚨 MEGA TEST START ({now}) 🚨\nNegative 1/3 Active.")
             data = await gist_op("load")
             if data:
                 test_set = random.sample(data, min(len(data), 100))
@@ -160,7 +141,7 @@ async def mega_test_timer():
             IS_RUNNING = True
         await asyncio.sleep(60)
 
-# ========== ALL BUTTONS & HANDLERS ==========
+# ========== ALL BUTTONS ==========
 MAIN_KB = ReplyKeyboardMarkup([
     [KeyboardButton("📝 Text Paste Karo"), KeyboardButton("📥 PDF Upload Karo")],
     [KeyboardButton("▶️ Polls Start"), KeyboardButton("⏹️ Polls Stop")],
@@ -168,58 +149,47 @@ MAIN_KB = ReplyKeyboardMarkup([
 ], resize_keyboard=True)
 
 @app.on_message(filters.command("start") & filters.private)
-async def start(c, m):
-    await m.reply_text("🎓 **Sarkari Naukri Academy PRO**\nAccuracy + Negative Marking + Auto Result Active!", reply_markup=MAIN_KB)
+async def start(c, m): await m.reply_text("🎓 **SNA Pro Bot Active!**", reply_markup=MAIN_KB)
 
 @app.on_message(filters.regex("📊 Status"))
 async def status(c, m):
     data = await gist_op("load")
-    state = "Running ✅" if IS_RUNNING else "Stopped ⏹️"
-    await m.reply_text(f"📊 **Status**\nPolls: {state}\nQuestions: {len(data)}\nInterval: {TIMER}s")
+    await m.reply_text(f"📊 Polls: {'On' if IS_RUNNING else 'Off'}\nQuestions: {len(data)}")
 
 @app.on_message(filters.regex("⏹️ Polls Stop") & filters.user(ADMIN_ID))
 async def stop(c, m):
     global IS_RUNNING
     IS_RUNNING = False
-    await m.reply_text("⏹️ Polls rok diye gaye hain.")
+    await m.reply_text("⏹️ Polls Stopped.")
 
 @app.on_message(filters.regex("▶️ Polls Start") & filters.user(ADMIN_ID))
 async def start_p(c, m):
     global IS_RUNNING
     IS_RUNNING = True
-    await m.reply_text("✅ Normal polls chalu kar diye gaye hain.")
-
-@app.on_message(filters.regex("📥 PDF Upload Karo") & filters.user(ADMIN_ID))
-async def pdf_req(c, m): await m.reply_text("📄 PDF file bhejien.")
-
-@app.on_message(filters.regex("📝 Text Paste Karo") & filters.user(ADMIN_ID))
-async def text_req(c, m):
-    WAITING_TEXT[m.from_user.id] = True
-    await m.reply_text("✏️ Text paste karein (Format: Sawal? - Jawab).")
-
-@app.on_message(filters.document & filters.user(ADMIN_ID))
-async def pdf_in(c, m):
-    st = await m.reply_text("⏳ Accuracy scanning... ⚡")
-    path = await m.download()
-    try:
-        doc = fitz.open(path)
-        text = " ".join([p.get_text() for p in doc])
-        doc.close()
-        new_qs = await groq_extract_bilingual(text)
-        old_qs = await gist_op("load")
-        old_qs.extend(new_qs)
-        await gist_op("save", old_qs)
-        await st.edit(f"✅ **{len(new_qs)} questions added safely!**")
-    except: await st.edit("❌ Error scanning PDF.")
-    if os.path.exists(path): os.remove(path)
+    await m.reply_text("✅ Polls Started.")
 
 @app.on_message(filters.regex("🗑️ Sab Delete Karo") & filters.user(ADMIN_ID))
 async def del_all(c, m):
     await gist_op("save", [])
     await m.reply_text("🗑️ Data cleaned.")
 
-# ========== MAIN LOOP ==========
-async def normal_poll_loop():
+@app.on_message(filters.document & filters.user(ADMIN_ID))
+async def pdf_in(c, m):
+    st = await m.reply_text("⏳ Processing...")
+    path = await m.download()
+    try:
+        doc = fitz.open(path)
+        text = " ".join([p.get_text() for p in doc])
+        doc.close()
+        new = await groq_extract_bilingual(text)
+        data = await gist_op("load")
+        data.extend(new)
+        await gist_op("save", data)
+        await st.edit(f"✅ {len(new)} Questions added!")
+    except: await st.edit("❌ Error.")
+    if os.path.exists(path): os.remove(path)
+
+async def normal_polling():
     idx = 0
     while True:
         if IS_RUNNING and not IS_MEGA_TEST:
@@ -236,8 +206,7 @@ async def normal_poll_loop():
 async def run_bot():
     Thread(target=run_server, daemon=True).start()
     await app.start()
-    print("🚀 SNA Mega Pro Final Ready!")
-    asyncio.create_task(normal_poll_loop())
+    asyncio.create_task(normal_polling())
     asyncio.create_task(mega_test_timer())
     await idle()
 
