@@ -5,454 +5,241 @@ import re
 import random
 import fitz
 import aiohttp
+from datetime import datetime
 from groq import Groq
 from pyrogram import Client, filters, idle
 from pyrogram.types import ReplyKeyboardMarkup, KeyboardButton
 from flask import Flask
 from threading import Thread
 
+# --- CONFIGURATION ---
 API_ID = int(os.environ.get("API_ID", 0))
 API_HASH = os.environ.get("API_HASH", "")
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
-GROQ_KEY = os.environ.get("GROQ_KEY", "")
+GROQ_API_KEY = os.environ.get("GROQ_KEY", "") 
 ADMIN_ID = int(os.environ.get("ADMIN_ID", 0))
 CHAT_ID = int(os.environ.get("CHAT_ID", 0))
 TIMER = int(os.environ.get("TIMER", 60))
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 GIST_ID = os.environ.get("GIST_ID", "")
 
-groq_client = Groq(api_key=GROQ_KEY)
-app = Client("SNA_BOT", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+# Clients
+client_ai = Groq(api_key=GROQ_API_KEY)
+app = Client("SNA_ULTIMATE_PRO", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 server = Flask(__name__)
+
+# Global State
+IS_RUNNING = True
+IS_MEGA_TEST = False
 WAITING_TEXT = {}
-IDX_FILE = "poll_idx.txt"
-STATUS_FILE = "poll_status.txt"
+TEST_POLLS = {} 
+USER_SCORES = {} 
 
 @server.route('/')
-def home(): return "SNA Bot 24x7!", 200
-def run_server(): server.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
+def home(): return "SNA Professional Bot is Live! 🚀", 200
 
-# ========== GITHUB GIST STORAGE ==========
-# Questions GitHub Gist mein save hote hain
-# Code update karne pe DELETE NAHI HONGE
+def run_server():
+    port = int(os.environ.get("PORT", 8080))
+    server.run(host='0.0.0.0', port=port)
 
-async def gist_load():
-    global GIST_ID
-    if not GITHUB_TOKEN:
-        if os.path.exists("quiz_data.json"):
-            try: return json.load(open("quiz_data.json","r",encoding='utf-8'))
-            except: pass
-        return []
-    if not GIST_ID: return []
-    try:
-        async with aiohttp.ClientSession() as s:
-            async with s.get(
-                f"https://api.github.com/gists/{GIST_ID}",
-                headers={"Authorization": f"token {GITHUB_TOKEN}"}
-            ) as r:
-                if r.status == 200:
-                    d = await r.json()
-                    return json.loads(d['files']['sna_questions.json']['content'])
-    except Exception as e:
-        print(f"Gist load error: {e}")
-    return []
-
-async def gist_save(questions):
-    global GIST_ID
-    content = json.dumps(questions, ensure_ascii=False, indent=2)
-    if not GITHUB_TOKEN:
-        with open("quiz_data.json","w",encoding='utf-8') as f:
-            f.write(content)
-        return True
-    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Content-Type": "application/json"}
-    payload = {
-        "description": "SNA Bot Questions — DO NOT DELETE",
-        "public": False,
-        "files": {"sna_questions.json": {"content": content}}
-    }
-    try:
-        async with aiohttp.ClientSession() as s:
-            if GIST_ID:
-                async with s.patch(f"https://api.github.com/gists/{GIST_ID}",
-                    headers=headers, json=payload) as r:
-                    return r.status == 200
-            else:
-                async with s.post("https://api.github.com/gists",
-                    headers=headers, json=payload) as r:
-                    if r.status == 201:
+# ========== GITHUB STORAGE (GIST) ==========
+async def gist_op(action, data=None):
+    if not GITHUB_TOKEN or not GIST_ID: return [] if action == "load" else False
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+    url = f"https://api.github.com/gists/{GIST_ID}"
+    async with aiohttp.ClientSession() as s:
+        try:
+            if action == "load":
+                async with s.get(url, headers=headers) as r:
+                    if r.status == 200:
                         d = await r.json()
-                        GIST_ID = d['id']
-                        print(f"✅ GIST CREATED! Add this to Railway: GIST_ID={GIST_ID}")
-                        return True
-    except Exception as e:
-        print(f"Gist save error: {e}")
-    return False
-
-async def add_and_save(new_qs):
-    existing = await gist_load()
-    existing.extend(new_qs)
-    await gist_save(existing)
-    return len(existing)
-
-def get_idx():
-    try: return int(open(IDX_FILE).read().strip()) if os.path.exists(IDX_FILE) else 0
-    except: return 0
-def set_idx(i): open(IDX_FILE,"w").write(str(i))
-def is_running(): return open(STATUS_FILE).read().strip()=="1" if os.path.exists(STATUS_FILE) else True
-def set_running(v): open(STATUS_FILE,"w").write("1" if v else "0")
-
-def clean_text(text):
-    text = re.sub(r'http\S+|www\S+|@\S+','',text)
-    for p in ['GK Trick','Nitin Gupta','Test Series','Google Play','Download','YouTube','Telegram','Instagram']:
-        text = re.sub(p,'',text,flags=re.IGNORECASE)
-    return re.sub(r'\s+',' ',text).strip()
-
-def split_chunks(text, size=1200):
-    words = text.split()
-    chunks, cur, cur_len = [], [], 0
-    for w in words:
-        cur.append(w); cur_len += len(w)
-        if cur_len >= size:
-            chunks.append(' '.join(cur)); cur, cur_len = [], 0
-    if cur: chunks.append(' '.join(cur))
-    return chunks
-
-def extract_json_list(text):
-    text = text.strip()
-    for fn in [
-        lambda t: json.loads(t),
-        lambda t: json.loads(re.sub(r'```(?:json)?','',t).strip().rstrip('`')),
-        lambda t: json.loads(re.search(r'(\[.*\])',t,re.DOTALL).group(1)),
-    ]:
-        try:
-            result = fn(text)
-            if isinstance(result, list): return result
-        except: pass
+                        return json.loads(d['files']['sna_questions.json']['content'])
+            else:
+                payload = {"files": {"sna_questions.json": {"content": json.dumps(data, ensure_ascii=False)}}}
+                async with s.patch(url, headers=headers, json=payload) as r:
+                    return r.status == 200
+        except: return [] if action == "load" else False
     return []
 
-# ========== Q&A EXTRACT FROM TEXT ==========
-
-def parse_qa_direct(text):
-    """
-    Text se seedha Q aur A nikalo.
-    "Gadar Party ke sansthapak? – Lala Hardayal"
-    → q="Gadar Party ke sansthapak?", a="Lala Hardayal"
-    """
-    qa_pairs = []
-    lines = text.strip().split('\n')
-    for line in lines:
-        line = line.strip()
-        if not line or len(line) < 5: continue
-        # Pattern: kuch bhi – answer
-        m = re.match(r'(?:\d+[\.\)]\s*)?(.+?)\s*[–—]\s*(.+)', line)
-        if m:
-            q = m.group(1).strip()
-            a = m.group(2).strip()
-            if len(q) > 3 and len(a) > 1:
-                if not q.endswith('?'): q += '?'
-                qa_pairs.append((q, a))
-    return qa_pairs
-
-async def make_3_wrong_options(question, correct_answer):
-    """
-    Sirf 3 galat options manao.
-    Sahi answer hum khud set karenge — AI pe depend nahi.
-    """
-    prompt = f"""Create 3 WRONG options for this Indian exam question.
-
-Question: {question}
-CORRECT answer (DO NOT include this): {correct_answer}
-
-Rules:
-- Options must be WRONG (not the correct answer)
-- Must look realistic and believable
-- Bilingual: Hindi / English format
-- Short — max 8 words each
-
-Return ONLY a JSON array of exactly 3 strings:
-["wrong1 / गलत1", "wrong2 / गलत2", "wrong3 / गलत3"]"""
-
+# ========== ACCURACY & BILINGUAL EXTRACTION ==========
+async def groq_extract_bilingual(text):
+    prompt = (
+        "Extract 20 high-quality MCQs from the text. "
+        "Every Question and Option MUST be Bilingual (English / Hindi). "
+        "Find the correct answer exactly from 'Ans - (A/B/C/D)' or 'Uttar:' in text. "
+        "Return ONLY a JSON list: "
+        "[{\"q\": \"Q? / स?❓\", \"o\": [\"Opt1\", \"Opt2\", \"Opt3\", \"Opt4\"], \"ans_txt\": \"Exact correct option text\"}].\n\n"
+        f"Text: {text[:9500]}"
+    )
     try:
-        r = groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[{"role":"user","content":prompt}],
-            temperature=0.8,
-            max_tokens=200
+        r = client_ai.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"}
         )
-        opts = extract_json_list(r.choices[0].message.content.strip())
-        if len(opts) >= 3:
-            return [str(o)[:100] for o in opts[:3]]
-    except Exception as e:
-        print(f"Wrong options error: {e}")
-    # Fallback
-    return [
-        "Jawaharlal Nehru / जवाहरलाल नेहरू",
-        "Mahatma Gandhi / महात्मा गांधी",
-        "Sardar Patel / सरदार पटेल"
-    ]
+        res = json.loads(r.choices[0].message.content)
+        raw_qs = res.get("questions", res) if isinstance(res, dict) else res
+        
+        final_qs = []
+        for item in raw_qs:
+            opts = item['o']
+            ans_text = item['ans_txt']
+            c_idx = 0
+            for i, o in enumerate(opts):
+                if ans_text in o or o in ans_text:
+                    c_idx = i
+                    break
+            final_qs.append({"q": item['q'], "o": opts, "c": c_idx})
+        return final_qs
+    except: return []
 
-async def make_bilingual_text(text):
-    """Text ko Hindi/English bilingual banao"""
-    try:
-        prompt = f"""Convert to bilingual format: "Hindi / English"
-Text: {text}
-Return ONLY: "हिंदी में / English version"
-Nothing else."""
-        r = groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[{"role":"user","content":prompt}],
-            temperature=0.1, max_tokens=150
-        )
-        result = r.choices[0].message.content.strip()
-        if len(result) > 3 and '/' in result:
-            return result[:255]
-    except:
-        pass
-    return text
+# ========== WINNER & LEADERBOARD (1/3 Negative) ==========
+async def publish_results():
+    global IS_MEGA_TEST, USER_SCORES, TEST_POLLS
+    if not USER_SCORES:
+        await app.send_message(CHAT_ID, "📊 **Update:** Aaj kisi ne test nahi diya.")
+    else:
+        results = []
+        for uid, s in USER_SCORES.items():
+            # 1/3 Negative Marking logic
+            score = s['c'] - (s['w'] * 0.33)
+            total = s['c'] + s['w']
+            perc = (s['c'] / total * 100) if total > 0 else 0
+            results.append({"name": s['n'], "score": round(score, 2), "perc": round(perc, 1), "c": s['c'], "w": s['w']})
+        
+        results = sorted(results, key=lambda x: x['score'], reverse=True)[:10]
+        
+        msg = "🏆 **SNA MEGA TEST FINAL RESULT** 🏆\n"
+        msg += "━━━━━━━━━━━━━━━━━━━━\n\n"
+        for i, r in enumerate(results, 1):
+            medal = "🥇" if i==1 else "🥈" if i==2 else "🥉" if i==3 else "🔹"
+            msg += f"{medal} **Rank {i}:** {r['name']}\n"
+            msg += f"   ┗ Marks: **{r['score']}** | Sahi: {r['c']} | Galat: {r['w']}\n"
+            msg += f"   ┗ Accuracy: {r['perc']}%\n\n"
+        
+        winner = results[0]['name']
+        msg += f"✨ **Winner: {winner}!** ✨\n"
+        msg += "━━━━━━━━━━━━━━━━━━━━\n"
+        msg += "🎉 Welcome to my group! **और अच्छा से मेहनत करो और Government Job पाओ!** 👮‍♂️🔥\n"
+        await app.send_message(CHAT_ID, msg)
 
-async def build_polls_from_text(text):
-    """
-    GUARANTEED CORRECT ANSWER SYSTEM:
-    
-    Step 1: Text se exact Q & A nikalo (parse_qa_direct)
-    Step 2: AI se sirf 3 GALAT options manao
-    Step 3: Sahi answer ko RANDOM position pe khud rakho
-    Step 4: c = woh position jo humne rakhi (100% sahi)
-    
-    Telegram quiz mein:
-    - Sahi option click = GREEN tick ✅
-    - Galat option click = RED cross ❌
-    Yeh Telegram automatic karta hai jab c sahi ho.
-    """
-    qa_pairs = parse_qa_direct(text)
+    IS_MEGA_TEST = False
+    USER_SCORES = {}
+    TEST_POLLS = {}
 
-    # Agar direct parse na ho, AI se extract karwao
-    if not qa_pairs:
-        try:
-            prompt = f"""Extract Q&A pairs from this text.
-Return JSON array: [{{"q":"question?","a":"answer"}}]
-Only include pairs where answer is clearly stated.
-TEXT: {text}"""
-            r = groq_client.chat.completions.create(
-                model="llama-3.1-8b-instant",
-                messages=[{"role":"user","content":prompt}],
-                temperature=0.1, max_tokens=2000
-            )
-            pairs = extract_json_list(r.choices[0].message.content)
-            for p in pairs:
-                if isinstance(p,dict) and 'q' in p and 'a' in p:
-                    q = str(p['q']).strip()
-                    a = str(p['a']).strip()
-                    if len(q)>3 and len(a)>1:
-                        if not q.endswith('?'): q+='?'
-                        qa_pairs.append((q, a))
-        except Exception as e:
-            print(f"AI extract error: {e}")
+@app.on_poll_answer()
+async def poll_ans(client, poll_answer):
+    if not IS_MEGA_TEST: return
+    pid = poll_answer.poll_id
+    if pid not in TEST_POLLS: return
+    uid = poll_answer.user.id
+    if uid not in USER_SCORES:
+        USER_SCORES[uid] = {"c": 0, "w": 0, "n": poll_answer.user.first_name}
+    if poll_answer.option_ids[0] == TEST_POLLS[pid]:
+        USER_SCORES[uid]["c"] += 1
+    else:
+        USER_SCORES[uid]["w"] += 1
 
-    polls = []
-    for question, correct_answer in qa_pairs:
-        try:
-            # Bilingual banao
-            bi_q = await make_bilingual_text(question)
-            bi_correct = await make_bilingual_text(correct_answer)
-            await asyncio.sleep(0.3)
+# ========== SCHEDULER (9, 12, 3, 5) ==========
+async def mega_test_timer():
+    while True:
+        now = datetime.now().strftime("%H:%M")
+        if now in ["09:00", "12:00", "15:00", "17:00"]:
+            global IS_MEGA_TEST, IS_RUNNING
+            IS_MEGA_TEST, IS_RUNNING = True, False
+            await app.send_message(CHAT_ID, f"🚨 **MEGA TEST START ({now})** 🚨\n100 Questions | Bilingual | Negative 1/3 Active.")
+            data = await gist_op("load")
+            if data:
+                test_set = random.sample(data, min(len(data), 100))
+                for q in test_set:
+                    poll = await app.send_poll(CHAT_ID, f"📖 GK MEGA TEST\n\n{q['q']}", q['o'], is_anonymous=False, type="quiz", correct_option_id=q['c'])
+                    TEST_POLLS[poll.poll.id] = q['c']
+                    await asyncio.sleep(15)
+                await asyncio.sleep(30)
+                await publish_results()
+            IS_RUNNING = True
+        await asyncio.sleep(60)
 
-            # 3 galat options lo
-            wrong_3 = await make_3_wrong_options(bi_q, bi_correct)
-            await asyncio.sleep(0.3)
-
-            # ✅ Sahi answer RANDOM position pe rakho — HUMNE KHUD
-            correct_pos = random.randint(0, 3)
-            options = wrong_3.copy()  # [w1, w2, w3]
-            options.insert(correct_pos, bi_correct)  # sahi answer insert
-            options = options[:4]  # exactly 4
-
-            polls.append({
-                "s": "GK / सामान्य ज्ञान",
-                "q": bi_q[:255],
-                "o": options,
-                "c": correct_pos  # ← 100% sahi! Humne khud rakha hai
-            })
-
-        except Exception as e:
-            print(f"Poll build error: {e}")
-            continue
-
-    return polls
-
-# ========== KEYBOARD ==========
-def main_kb():
-    return ReplyKeyboardMarkup([
-        [KeyboardButton("📝 Text Paste Karo"), KeyboardButton("📤 PDF Upload Karo")],
-        [KeyboardButton("▶️ Polls Start"),     KeyboardButton("⏹️ Polls Stop")],
-        [KeyboardButton("📊 Status"),          KeyboardButton("🗑️ Sab Delete Karo")]
-    ], resize_keyboard=True)
-
-# ========== BOT HANDLERS ==========
+# ========== ALL BUTTONS & HANDLERS ==========
+MAIN_KB = ReplyKeyboardMarkup([
+    [KeyboardButton("📝 Text Paste Karo"), KeyboardButton("📥 PDF Upload Karo")],
+    [KeyboardButton("▶️ Polls Start"), KeyboardButton("⏹️ Polls Stop")],
+    [KeyboardButton("📊 Status"), KeyboardButton("🗑️ Sab Delete Karo")]
+], resize_keyboard=True)
 
 @app.on_message(filters.command("start") & filters.private)
-async def start(client, message):
-    data = await gist_load()
-    await message.reply_text(
-        "🎓 **Sarkari Naukri Academy Bot**\n\n"
-        f"📊 Questions: **{len(data)}**\n"
-        f"🔄 Status: **{'Running ✅' if is_running() else 'Stopped ⏹️'}**\n"
-        f"⏱ Interval: **{TIMER} sec**\n"
-        f"💾 Storage: **{'GitHub Gist ✅' if GITHUB_TOKEN else 'Local ⚠️'}**\n\n"
-        "👇 Buttons:",
-        reply_markup=main_kb()
-    )
+async def start(c, m):
+    await m.reply_text("🎓 **Sarkari Naukri Academy PRO**\nAccuracy + Negative Marking + Auto Result Active!", reply_markup=MAIN_KB)
 
-@app.on_message(filters.regex("📝 Text Paste Karo") & filters.private & filters.user(ADMIN_ID))
-async def ask_text(client, message):
-    WAITING_TEXT[message.from_user.id] = True
-    await message.reply_text(
-        "✏️ **Text paste karo — koi bhi format:**\n\n"
-        "`Gadar Party ke sansthapak? – Lala Hardayal`\n"
-        "`Dandi March kab? – 12 March 1930`\n"
-        "`Bharat ki rajdhani? – New Delhi`\n\n"
-        "50+ questions ek saath de sakte ho!"
-    )
+@app.on_message(filters.regex("📊 Status"))
+async def status(c, m):
+    data = await gist_op("load")
+    state = "Running ✅" if IS_RUNNING else "Stopped ⏹️"
+    await m.reply_text(f"📊 **Status**\nPolls: {state}\nQuestions: {len(data)}\nInterval: {TIMER}s")
 
-@app.on_message(filters.regex("📤 PDF Upload Karo") & filters.private & filters.user(ADMIN_ID))
-async def ask_pdf(client, message):
-    await message.reply_text("📄 Ab PDF bhejien.")
+@app.on_message(filters.regex("⏹️ Polls Stop") & filters.user(ADMIN_ID))
+async def stop(c, m):
+    global IS_RUNNING
+    IS_RUNNING = False
+    await m.reply_text("⏹️ Polls rok diye gaye hain.")
 
-@app.on_message(filters.regex("▶️ Polls Start") & filters.private & filters.user(ADMIN_ID))
-async def polls_start(client, message):
-    set_running(True)
-    data = await gist_load()
-    await message.reply_text(f"✅ Polls shuru! Total: {len(data)} questions.")
+@app.on_message(filters.regex("▶️ Polls Start") & filters.user(ADMIN_ID))
+async def start_p(c, m):
+    global IS_RUNNING
+    IS_RUNNING = True
+    await m.reply_text("✅ Normal polls chalu kar diye gaye hain.")
 
-@app.on_message(filters.regex("⏹️ Polls Stop") & filters.private & filters.user(ADMIN_ID))
-async def polls_stop(client, message):
-    set_running(False)
-    await message.reply_text("⏹️ Polls rok diye.")
+@app.on_message(filters.regex("📥 PDF Upload Karo") & filters.user(ADMIN_ID))
+async def pdf_req(c, m): await m.reply_text("📄 PDF file bhejien.")
 
-@app.on_message(filters.regex("📊 Status") & filters.private & filters.user(ADMIN_ID))
-async def show_status(client, message):
-    data = await gist_load()
-    idx = get_idx()
-    await message.reply_text(
-        f"📊 **Bot Status**\n\n"
-        f"🔄 Polls: {'Running ✅' if is_running() else 'Stopped ⏹️'}\n"
-        f"❓ Total Questions: {len(data)}\n"
-        f"📍 Next Poll: #{idx+1}\n"
-        f"⏱ Interval: {TIMER} sec\n"
-        f"💾 Storage: {'GitHub Gist ✅' if GITHUB_TOKEN else 'Local ⚠️'}"
-    )
+@app.on_message(filters.regex("📝 Text Paste Karo") & filters.user(ADMIN_ID))
+async def text_req(c, m):
+    WAITING_TEXT[m.from_user.id] = True
+    await m.reply_text("✏️ Text paste karein (Format: Sawal? - Jawab).")
 
-@app.on_message(filters.regex("🗑️ Sab Delete Karo") & filters.private & filters.user(ADMIN_ID))
-async def delete_all(client, message):
-    await gist_save([])
-    set_idx(0)
-    await message.reply_text("🗑️ Saare questions delete ho gaye!")
-
-@app.on_message(
-    filters.text & filters.private & filters.user(ADMIN_ID) &
-    ~filters.command(["start"]) &
-    ~filters.regex("^(📝|📤|▶️|⏹️|📊|🗑️)")
-)
-async def handle_text_input(client, message):
-    if not WAITING_TEXT.get(message.from_user.id, False): return
-    WAITING_TEXT[message.from_user.id] = False
-    text = message.text.strip()
-    if len(text) < 5: return
-
-    st = await message.reply_text("⚙️ Processing...")
-    try:
-        lines = [l for l in text.split('\n') if l.strip()]
-        all_qs, chunk_size = [], 10
-        total_chunks = (len(lines) + chunk_size - 1) // chunk_size
-
-        for i in range(0, len(lines), chunk_size):
-            chunk = '\n'.join(lines[i:i+chunk_size])
-            cn = i//chunk_size + 1
-            await st.edit(f"⚙️ Processing {cn}/{total_chunks}...\n✅ Done: {len(all_qs)}")
-            qs = await build_polls_from_text(chunk)
-            all_qs.extend(qs)
-            await asyncio.sleep(1)
-
-        if not all_qs:
-            return await st.edit("❌ Questions nahi mile.\nFormat: `Sawal? – Jawab`")
-
-        total = await add_and_save(all_qs)
-        await st.edit(
-            f"✅ **{len(all_qs)} polls ready!**\n"
-            f"📊 Total saved: {total}\n"
-            f"✔️ Sahi answer 100% correct!\n"
-            f"💾 GitHub mein safe ✅"
-        )
-    except Exception as e:
-        await st.edit(f"❌ Error: {str(e)[:200]}")
-
-@app.on_message(filters.document & filters.user(ADMIN_ID) & filters.private)
-async def handle_pdf_upload(client, message):
-    if message.document.mime_type != "application/pdf":
-        return await message.reply_text("❌ Sirf PDF bhejien.")
-    st = await message.reply_text("⏳ PDF pad raha hoon...")
-    path = await message.download()
+@app.on_message(filters.document & filters.user(ADMIN_ID))
+async def pdf_in(c, m):
+    st = await m.reply_text("⏳ Accuracy scanning... ⚡")
+    path = await m.download()
     try:
         doc = fitz.open(path)
-        raw = " ".join([p.get_text() for p in doc])
+        text = " ".join([p.get_text() for p in doc])
         doc.close()
-        if len(raw.strip()) < 100:
-            return await st.edit("❌ PDF mein text nahi mila.")
-        cleaned = clean_text(raw)
-        chunks = split_chunks(cleaned, size=1200)
-        all_qs = []
-        for i, chunk in enumerate(chunks):
-            if len(chunk.strip()) < 50: continue
-            await st.edit(f"⚙️ Section {i+1}/{len(chunks)}\n✅ Questions: {len(all_qs)}")
-            try:
-                qs = await build_polls_from_text(chunk)
-                all_qs.extend(qs)
-                await asyncio.sleep(1)
-            except: await asyncio.sleep(3)
-        if not all_qs:
-            return await st.edit("❌ Koi question nahi bana.")
-        total = await add_and_save(all_qs)
-        await st.edit(
-            f"🎉 **PDF Done!**\n"
-            f"❓ Questions: {len(all_qs)}\n"
-            f"📊 Total: {total}\n"
-            f"✔️ Sahi answer 100% correct!\n"
-            f"💾 GitHub mein save ✅"
-        )
-    except Exception as e:
-        await st.edit(f"❌ Error: {str(e)[:200]}")
-    finally:
-        if os.path.exists(path): os.remove(path)
+        new_qs = await groq_extract_bilingual(text)
+        old_qs = await gist_op("load")
+        old_qs.extend(new_qs)
+        await gist_op("save", old_qs)
+        await st.edit(f"✅ **{len(new_qs)} questions added safely!**")
+    except: await st.edit("❌ Error scanning PDF.")
+    if os.path.exists(path): os.remove(path)
 
-# ========== 24x7 POLL LOOP ==========
-async def poll_loop():
+@app.on_message(filters.regex("🗑️ Sab Delete Karo") & filters.user(ADMIN_ID))
+async def del_all(c, m):
+    await gist_op("save", [])
+    await m.reply_text("🗑️ Data cleaned.")
+
+# ========== MAIN LOOP ==========
+async def normal_poll_loop():
+    idx = 0
     while True:
-        try:
-            if is_running():
-                data = await gist_load()
+        if IS_RUNNING and not IS_MEGA_TEST:
+            try:
+                data = await gist_op("load")
                 if data:
-                    idx = get_idx()
                     if idx >= len(data): idx = 0
                     q = data[idx]
-                    await app.send_poll(
-                        CHAT_ID,
-                        f"📖 {q.get('s','GK')}\n\n{q['q']}",
-                        q['o'],
-                        is_anonymous=False,
-                        type="quiz",
-                        correct_option_id=q['c']
-                    )
-                    set_idx(idx + 1)
-        except Exception as e:
-            print(f"[POLL ERROR] {e}")
+                    await app.send_poll(CHAT_ID, f"📖 GK SPECIAL\n\n{q['q']}", q['o'], is_anonymous=False, type="quiz", correct_option_id=q['c'])
+                    idx += 1
+            except: pass
         await asyncio.sleep(TIMER)
 
-async def main():
+async def run_bot():
     Thread(target=run_server, daemon=True).start()
     await app.start()
-    print("🚀 SNA Bot Online — 24x7!")
-    asyncio.create_task(poll_loop())
+    print("🚀 SNA Mega Pro Final Ready!")
+    asyncio.create_task(normal_poll_loop())
+    asyncio.create_task(mega_test_timer())
     await idle()
 
 if __name__ == "__main__":
-    asyncio.get_event_loop().run_until_complete(main())
+    asyncio.get_event_loop().run_until_complete(run_bot())
