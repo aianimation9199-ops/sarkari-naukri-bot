@@ -1,458 +1,906 @@
-import os
-import asyncio
-import json
-import re
-import random
-import fitz
-import aiohttp
-from groq import Groq
-from pyrogram import Client, filters, idle
-from pyrogram.types import ReplyKeyboardMarkup, KeyboardButton
-from flask import Flask
-from threading import Thread
+"""
+╔══════════════════════════════════════════════════════╗
+║     SARKARI NAUKRI ACADEMY - ADVANCED QUIZ BOT       ║
+║     Railway.app + GitHub Storage + Groq AI           ║
+╚══════════════════════════════════════════════════════╝
 
-API_ID = int(os.environ.get("API_ID", 0))
-API_HASH = os.environ.get("API_HASH", "")
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
-GROQ_KEY = os.environ.get("GROQ_KEY", "")
-ADMIN_ID = int(os.environ.get("ADMIN_ID", 0))
-CHAT_ID = int(os.environ.get("CHAT_ID", 0))
-TIMER = int(os.environ.get("TIMER", 60))
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
-GIST_ID = os.environ.get("GIST_ID", "")
+Railway Environment Variables needed:
+  BOT_TOKEN     - Telegram Bot Token
+  ADMIN_ID      - Your Telegram User ID
+  CHAT_ID       - Your Channel/Group ID
+  GITHUB_TOKEN  - GitHub Personal Access Token
+  API_ID        - Telegram API ID (for Pyrogram if needed)
+  API_HASH      - Telegram API Hash
+  GROQ_KEY      - Groq AI API Key
+  TIMER         - Poll interval in seconds (e.g. 60)
+"""
 
-groq_client = Groq(api_key=GROQ_KEY)
-app = Client("SNA_BOT", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
-server = Flask(__name__)
-WAITING_TEXT = {}
-IDX_FILE = "poll_idx.txt"
-STATUS_FILE = "poll_status.txt"
+import os, json, time, asyncio, logging, random, re
+import requests
+from datetime import datetime
+from telegram import (
+    Update, Poll, InlineKeyboardButton, InlineKeyboardMarkup
+)
+from telegram.ext import (
+    Application, CommandHandler, MessageHandler,
+    PollAnswerHandler, CallbackQueryHandler,
+    ContextTypes, filters
+)
 
-@server.route('/')
-def home(): return "SNA Bot 24x7!", 200
-def run_server(): server.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
+# ════════════════════════════════════════════
+# CONFIG
+# ════════════════════════════════════════════
+BOT_TOKEN     = os.environ.get("BOT_TOKEN", "")
+ADMIN_ID      = int(os.environ.get("ADMIN_ID", "0"))
+CHAT_ID       = os.environ.get("CHAT_ID", "")
+GITHUB_TOKEN  = os.environ.get("GITHUB_TOKEN", "")
+GROQ_KEY      = os.environ.get("GROQ_KEY", "")
+TIMER         = int(os.environ.get("TIMER", "60"))
 
-# ========== GITHUB GIST STORAGE ==========
-# Questions GitHub Gist mein save hote hain
-# Code update karne pe DELETE NAHI HONGE
+# GitHub repo details — apna update karo
+GITHUB_USER   = "aianimation9199-ops"
+GITHUB_REPO   = "sarkari-naukri-bot"
+GITHUB_BRANCH = "main"
 
-async def gist_load():
-    global GIST_ID
-    if not GITHUB_TOKEN:
-        if os.path.exists("quiz_data.json"):
-            try: return json.load(open("quiz_data.json","r",encoding='utf-8'))
-            except: pass
-        return []
-    if not GIST_ID: return []
-    try:
-        async with aiohttp.ClientSession() as s:
-            async with s.get(
-                f"https://api.github.com/gists/{GIST_ID}",
-                headers={"Authorization": f"token {GITHUB_TOKEN}"}
-            ) as r:
-                if r.status == 200:
-                    d = await r.json()
-                    return json.loads(d['files']['sna_questions.json']['content'])
-    except Exception as e:
-        print(f"Gist load error: {e}")
-    return []
+# Test settings
+TOTAL_Q       = 100          # Questions per test
+TEST_MINUTES  = 15           # Test duration
+TEST_SECONDS  = TEST_MINUTES * 60
 
-async def gist_save(questions):
-    global GIST_ID
-    content = json.dumps(questions, ensure_ascii=False, indent=2)
-    if not GITHUB_TOKEN:
-        with open("quiz_data.json","w",encoding='utf-8') as f:
-            f.write(content)
-        return True
-    headers = {"Authorization": f"token {GITHUB_TOKEN}", "Content-Type": "application/json"}
-    payload = {
-        "description": "SNA Bot Questions — DO NOT DELETE",
-        "public": False,
-        "files": {"sna_questions.json": {"content": content}}
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+# ════════════════════════════════════════════
+# GITHUB FILE STORAGE (repo-based, safe update)
+# ════════════════════════════════════════════
+
+def github_read(filename: str):
+    """Read a JSON file from GitHub repo. Returns {} or [] on failure."""
+    url = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/contents/{filename}"
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
     }
     try:
-        async with aiohttp.ClientSession() as s:
-            if GIST_ID:
-                async with s.patch(f"https://api.github.com/gists/{GIST_ID}",
-                    headers=headers, json=payload) as r:
-                    return r.status == 200
-            else:
-                async with s.post("https://api.github.com/gists",
-                    headers=headers, json=payload) as r:
-                    if r.status == 201:
-                        d = await r.json()
-                        GIST_ID = d['id']
-                        print(f"✅ GIST CREATED! Add this to Railway: GIST_ID={GIST_ID}")
-                        return True
+        r = requests.get(url, headers=headers, timeout=10)
+        if r.status_code == 404:
+            return {}
+        r.raise_for_status()
+        import base64
+        content = base64.b64decode(r.json()["content"]).decode("utf-8")
+        return json.loads(content)
     except Exception as e:
-        print(f"Gist save error: {e}")
-    return False
+        logger.error(f"GitHub read error ({filename}): {e}")
+        return {}
 
-async def add_and_save(new_qs):
-    existing = await gist_load()
-    existing.extend(new_qs)
-    await gist_save(existing)
-    return len(existing)
+def github_write(filename: str, data, commit_msg: str = "Bot update"):
+    """Write/update a JSON file in GitHub repo. Existing other files stay safe."""
+    url = f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/contents/{filename}"
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    import base64
 
-def get_idx():
-    try: return int(open(IDX_FILE).read().strip()) if os.path.exists(IDX_FILE) else 0
-    except: return 0
-def set_idx(i): open(IDX_FILE,"w").write(str(i))
-def is_running(): return open(STATUS_FILE).read().strip()=="1" if os.path.exists(STATUS_FILE) else True
-def set_running(v): open(STATUS_FILE,"w").write("1" if v else "0")
+    # Get current SHA (needed for update)
+    sha = None
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        if r.status_code == 200:
+            sha = r.json().get("sha")
+    except Exception:
+        pass
 
-def clean_text(text):
-    text = re.sub(r'http\S+|www\S+|@\S+','',text)
-    for p in ['GK Trick','Nitin Gupta','Test Series','Google Play','Download','YouTube','Telegram','Instagram']:
-        text = re.sub(p,'',text,flags=re.IGNORECASE)
-    return re.sub(r'\s+',' ',text).strip()
+    content_b64 = base64.b64encode(
+        json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+    ).decode("utf-8")
 
-def split_chunks(text, size=1200):
-    words = text.split()
-    chunks, cur, cur_len = [], [], 0
-    for w in words:
-        cur.append(w); cur_len += len(w)
-        if cur_len >= size:
-            chunks.append(' '.join(cur)); cur, cur_len = [], 0
-    if cur: chunks.append(' '.join(cur))
-    return chunks
+    payload = {
+        "message": commit_msg,
+        "content": content_b64,
+        "branch": GITHUB_BRANCH
+    }
+    if sha:
+        payload["sha"] = sha
 
-def extract_json_list(text):
-    text = text.strip()
-    for fn in [
-        lambda t: json.loads(t),
-        lambda t: json.loads(re.sub(r'```(?:json)?','',t).strip().rstrip('`')),
-        lambda t: json.loads(re.search(r'(\[.*\])',t,re.DOTALL).group(1)),
-    ]:
-        try:
-            result = fn(text)
-            if isinstance(result, list): return result
-        except: pass
-    return []
+    try:
+        r = requests.put(url, headers=headers, json=payload, timeout=15)
+        r.raise_for_status()
+        logger.info(f"GitHub updated: {filename}")
+        return True
+    except Exception as e:
+        logger.error(f"GitHub write error ({filename}): {e}")
+        return False
 
-# ========== Q&A EXTRACT FROM TEXT ==========
+# File names in repo
+QUESTIONS_FILE = "quiz_data.json"   # Already exists in your repo!
+SCORES_FILE    = "scores.json"
+SESSIONS_FILE  = "sessions.json"
 
-def parse_qa_direct(text):
-    """
-    Text se seedha Q aur A nikalo.
-    "Gadar Party ke sansthapak? – Lala Hardayal"
-    → q="Gadar Party ke sansthapak?", a="Lala Hardayal"
-    """
-    qa_pairs = []
-    lines = text.strip().split('\n')
-    for line in lines:
-        line = line.strip()
-        if not line or len(line) < 5: continue
-        # Pattern: kuch bhi – answer
-        m = re.match(r'(?:\d+[\.\)]\s*)?(.+?)\s*[–—]\s*(.+)', line)
-        if m:
-            q = m.group(1).strip()
-            a = m.group(2).strip()
-            if len(q) > 3 and len(a) > 1:
-                if not q.endswith('?'): q += '?'
-                qa_pairs.append((q, a))
-    return qa_pairs
+# ════════════════════════════════════════════
+# GROQ AI — Hindi+English question generator
+# ════════════════════════════════════════════
 
-async def make_3_wrong_options(question, correct_answer):
-    """
-    Sirf 3 galat options manao.
-    Sahi answer hum khud set karenge — AI pe depend nahi.
-    """
-    prompt = f"""Create 3 WRONG options for this Indian exam question.
+def groq_generate_questions(subject: str, count: int = 5) -> list:
+    """Use Groq AI to generate bilingual quiz questions."""
+    if not GROQ_KEY:
+        return []
 
-Question: {question}
-CORRECT answer (DO NOT include this): {correct_answer}
+    prompt = f"""Generate {count} multiple choice quiz questions about "{subject}" for Indian government job exams (SSC, Railway, UPSC).
+
+STRICT FORMAT — return ONLY valid JSON array, nothing else:
+[
+  {{
+    "question_hi": "हिंदी में प्रश्न?",
+    "question_en": "Question in English?",
+    "options": [
+      "हिंदी option1 / English option1",
+      "हिंदी option2 / English option2",
+      "हिंदी option3 / English option3",
+      "हिंदी option4 / English option4"
+    ],
+    "answer_index": 0,
+    "subject": "{subject}",
+    "explanation_hi": "संक्षिप्त व्याख्या",
+    "explanation_en": "Brief explanation"
+  }}
+]
 
 Rules:
-- Options must be WRONG (not the correct answer)
-- Must look realistic and believable
-- Bilingual: Hindi / English format
-- Short — max 8 words each
-
-Return ONLY a JSON array of exactly 3 strings:
-["wrong1 / गलत1", "wrong2 / गलत2", "wrong3 / गलत3"]"""
+- answer_index is 0-based (0=first option is correct)
+- Questions must be factually correct
+- Mix Hindi and English in options (format: हिंदी / English)
+- Suitable for SSC CGL, Railway, UPSC level"""
 
     try:
-        r = groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[{"role":"user","content":prompt}],
-            temperature=0.8,
-            max_tokens=200
+        r = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {GROQ_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "llama3-8b-8192",
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.7,
+                "max_tokens": 3000
+            },
+            timeout=30
         )
-        opts = extract_json_list(r.choices[0].message.content.strip())
-        if len(opts) >= 3:
-            return [str(o)[:100] for o in opts[:3]]
+        r.raise_for_status()
+        text = r.json()["choices"][0]["message"]["content"]
+        # Extract JSON array safely
+        match = re.search(r'\[.*\]', text, re.DOTALL)
+        if match:
+            return json.loads(match.group())
     except Exception as e:
-        print(f"Wrong options error: {e}")
-    # Fallback
-    return [
-        "Jawaharlal Nehru / जवाहरलाल नेहरू",
-        "Mahatma Gandhi / महात्मा गांधी",
-        "Sardar Patel / सरदार पटेल"
+        logger.error(f"Groq error: {e}")
+    return []
+
+# ════════════════════════════════════════════
+# IN-MEMORY TEST SESSIONS
+# ════════════════════════════════════════════
+# active_tests[chat_id] = {
+#   questions, current, poll_map, user_data,
+#   start_time, mode, timer_task
+# }
+active_tests = {}
+
+# ════════════════════════════════════════════
+# HELPERS
+# ════════════════════════════════════════════
+
+def get_subjects(questions: list) -> list:
+    return sorted(set(q.get("subject", "General") for q in questions))
+
+def select_questions(questions: list, mode: str, count: int) -> list:
+    pool = questions if mode == "mixed" else [
+        q for q in questions if q.get("subject", "General") == mode
     ]
+    count = min(count, len(pool))
+    return random.sample(pool, count) if pool else []
 
-async def make_bilingual_text(text):
-    """Text ko Hindi/English bilingual banao"""
-    try:
-        prompt = f"""Convert to bilingual format: "Hindi / English"
-Text: {text}
-Return ONLY: "हिंदी में / English version"
-Nothing else."""
-        r = groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[{"role":"user","content":prompt}],
-            temperature=0.1, max_tokens=150
+def fmt_time(seconds: float) -> str:
+    m, s = int(seconds) // 60, int(seconds) % 60
+    return f"{m}m {s}s"
+
+def build_question_text(q: dict, idx: int, total: int) -> str:
+    """Build bilingual question text."""
+    hi = q.get("question_hi") or q.get("question", "")
+    en = q.get("question_en", "")
+    num = f"Q{idx+1}/{total}"
+
+    if hi and en:
+        text = f"{num}: {hi}\n{en}"
+    elif hi:
+        text = f"{num}: {hi}"
+    else:
+        text = f"{num}: {en or q.get('question','?')}"
+
+    return text[:300]  # Telegram poll limit
+
+def build_options(q: dict) -> list:
+    """Return options list, bilingual if available."""
+    return q.get("options", ["A", "B", "C", "D"])[:10]
+
+def leaderboard_text(scores: dict, top_n: int = 20) -> str:
+    if not scores:
+        return "📊 Abhi koi score nahi hai.\nPehle /test karke participate karo!"
+
+    sorted_s = sorted(
+        scores.items(),
+        key=lambda x: (-x[1].get("total_score", 0), x[1].get("best_time", 99999))
+    )[:top_n]
+
+    medals = {0: "🥇", 1: "🥈", 2: "🥉"}
+    lines = [
+        "🏆 *LEADERBOARD — TOP 20* 🏆",
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+    ]
+    for i, (uid, d) in enumerate(sorted_s):
+        medal = medals.get(i, f"`{i+1}.`")
+        name  = d.get("name", "Unknown")
+        score = d.get("total_score", 0)
+        best  = fmt_time(d.get("best_time", 0))
+        tests = d.get("tests_taken", 0)
+        acc   = round(d.get("total_correct_pct", 0), 1)
+        lines.append(
+            f"{medal} *{name}*\n"
+            f"   ✅ Score: `{score}` | ⏱ Best: `{best}`\n"
+            f"   📝 Tests: `{tests}` | 🎯 Accuracy: `{acc}%`"
         )
-        result = r.choices[0].message.content.strip()
-        if len(result) > 3 and '/' in result:
-            return result[:255]
-    except:
-        pass
-    return text
 
-async def build_polls_from_text(text):
-    """
-    GUARANTEED CORRECT ANSWER SYSTEM:
-    
-    Step 1: Text se exact Q & A nikalo (parse_qa_direct)
-    Step 2: AI se sirf 3 GALAT options manao
-    Step 3: Sahi answer ko RANDOM position pe khud rakho
-    Step 4: c = woh position jo humne rakhi (100% sahi)
-    
-    Telegram quiz mein:
-    - Sahi option click = GREEN tick ✅
-    - Galat option click = RED cross ❌
-    Yeh Telegram automatic karta hai jab c sahi ho.
-    """
-    qa_pairs = parse_qa_direct(text)
+    lines.append("\n━━━━━━━━━━━━━━━━━━━━━━")
+    return "\n".join(lines)
 
-    # Agar direct parse na ho, AI se extract karwao
-    if not qa_pairs:
-        try:
-            prompt = f"""Extract Q&A pairs from this text.
-Return JSON array: [{{"q":"question?","a":"answer"}}]
-Only include pairs where answer is clearly stated.
-TEXT: {text}"""
-            r = groq_client.chat.completions.create(
-                model="llama-3.1-8b-instant",
-                messages=[{"role":"user","content":prompt}],
-                temperature=0.1, max_tokens=2000
+def main_keyboard():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("📝 Mixed Test (सभी विषय)", callback_data="mode_mixed")],
+        [InlineKeyboardButton("📚 Subject-wise Test",      callback_data="mode_subject")],
+        [InlineKeyboardButton("🤖 AI से Questions बनाओ",  callback_data="ai_generate")],
+        [InlineKeyboardButton("🏆 Leaderboard",            callback_data="leaderboard"),
+         InlineKeyboardButton("📊 My Score",               callback_data="myscore")],
+        [InlineKeyboardButton("➕ Questions Add करो",      callback_data="addq_help")],
+    ])
+
+# ════════════════════════════════════════════
+# COMMANDS
+# ════════════════════════════════════════════
+
+async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "🎓 *Sarkari Naukri Academy Quiz Bot*\n\n"
+        "📋 *Test Format:*\n"
+        "• 100 Questions | ⏱ 15 Minutes\n"
+        "• ✅ Sahi answer = +1 mark\n"
+        "• ❌ Galat answer = wrong count\n"
+        "• 🏆 Top 20 Leaderboard\n"
+        "• 📖 Hindi + English dono mein\n\n"
+        "Mode choose karo 👇",
+        reply_markup=main_keyboard(),
+        parse_mode="Markdown"
+    )
+
+async def cmd_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    questions = github_read(QUESTIONS_FILE)
+    if isinstance(questions, dict):
+        # Handle old format {questions: [...]}
+        questions = questions.get("questions", [])
+    if not isinstance(questions, list):
+        questions = []
+
+    scores = github_read(SCORES_FILE)
+    if not isinstance(scores, dict):
+        scores = {}
+
+    subjects = get_subjects(questions)
+    subj_lines = "\n".join(
+        f"  • {s}: {sum(1 for q in questions if q.get('subject','General')==s)} Qs"
+        for s in subjects
+    ) or "  None"
+
+    await update.message.reply_text(
+        f"📊 *Bot Status*\n"
+        f"━━━━━━━━━━━━━━━━━\n"
+        f"❓ Total Questions: `{len(questions)}`\n"
+        f"👥 Registered Users: `{len(scores)}`\n"
+        f"🔴 Active Tests: `{len(active_tests)}`\n"
+        f"⏱ Poll Timer: `{TIMER}s`\n\n"
+        f"*📚 Subjects:*\n{subj_lines}\n"
+        f"━━━━━━━━━━━━━━━━━\n"
+        f"💾 Storage: GitHub Repo ✅",
+        parse_mode="Markdown"
+    )
+
+async def cmd_leaderboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    scores = github_read(SCORES_FILE)
+    if not isinstance(scores, dict):
+        scores = {}
+    await update.message.reply_text(leaderboard_text(scores), parse_mode="Markdown")
+
+async def cmd_stoptest(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    if chat_id in active_tests:
+        await end_test(ctx.application, chat_id, forced=True)
+        await update.message.reply_text("⏹ Test rok diya gaya.")
+    else:
+        await update.message.reply_text("⚠️ Koi test chal nahi raha.")
+
+async def cmd_addq(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text("❌ Sirf admin use kar sakta hai.")
+        return
+    ctx.user_data["awaiting_questions"] = True
+    await update.message.reply_text(
+        "📝 *Questions Paste Karo — Format:*\n\n"
+        "```\n"
+        "SUBJECT: History\n"
+        "QH: हिंदी में प्रश्न?\n"
+        "QE: Question in English?\n"
+        "A: Option 1 हिंदी / English\n"
+        "B: Option 2 हिंदी / English\n"
+        "C: Option 3 हिंदी / English\n"
+        "D: Option 4 हिंदी / English\n"
+        "ANS: B\n"
+        "---\n"
+        "```\n"
+        "Multiple questions ke beech `---` lagao.\n"
+        "⚠️ Existing questions DELETE NAHI HONGE.",
+        parse_mode="Markdown"
+    )
+
+async def cmd_deleteall(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Admin only: delete all questions with confirmation."""
+    if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text("❌ Sirf admin.")
+        return
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Haan, Delete Karo", callback_data="confirm_deleteall")],
+        [InlineKeyboardButton("❌ Cancel", callback_data="cancel_delete")]
+    ])
+    await update.message.reply_text(
+        "⚠️ *Kya aap SARE questions delete karna chahte ho?*\n"
+        "Ye action undo nahi hoga!",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+
+# ════════════════════════════════════════════
+# CALLBACK HANDLER
+# ════════════════════════════════════════════
+
+async def callback_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data  = query.data
+    chat_id = query.message.chat_id
+    user    = query.from_user
+
+    # ── Leaderboard ──────────────────────────
+    if data == "leaderboard":
+        scores = github_read(SCORES_FILE)
+        if not isinstance(scores, dict):
+            scores = {}
+        await query.message.reply_text(leaderboard_text(scores), parse_mode="Markdown")
+        return
+
+    # ── My Score ─────────────────────────────
+    if data == "myscore":
+        uid = str(user.id)
+        scores = github_read(SCORES_FILE)
+        if not isinstance(scores, dict):
+            scores = {}
+        if uid in scores:
+            d = scores[uid]
+            total_ans = d.get("total_correct", 0) + d.get("total_wrong", 0)
+            acc = round(d["total_correct"] / total_ans * 100, 1) if total_ans else 0
+            text = (
+                f"📊 *Tumhara Score*\n"
+                f"━━━━━━━━━━━━━━━━\n"
+                f"👤 {d.get('name','?')}\n"
+                f"✅ Total Correct: `{d.get('total_correct',0)}`\n"
+                f"❌ Total Wrong: `{d.get('total_wrong',0)}`\n"
+                f"🎯 Accuracy: `{acc}%`\n"
+                f"📝 Tests Liye: `{d.get('tests_taken',0)}`\n"
+                f"⏱ Best Time: `{fmt_time(d.get('best_time',0))}`\n"
+                f"🏆 Total Score: `{d.get('total_score',0)}`"
             )
-            pairs = extract_json_list(r.choices[0].message.content)
-            for p in pairs:
-                if isinstance(p,dict) and 'q' in p and 'a' in p:
-                    q = str(p['q']).strip()
-                    a = str(p['a']).strip()
-                    if len(q)>3 and len(a)>1:
-                        if not q.endswith('?'): q+='?'
-                        qa_pairs.append((q, a))
-        except Exception as e:
-            print(f"AI extract error: {e}")
+        else:
+            text = "Tumne abhi koi test nahi diya.\n/test se shuru karo!"
+        await query.message.reply_text(text, parse_mode="Markdown")
+        return
 
-    polls = []
-    for question, correct_answer in qa_pairs:
-        try:
-            # Bilingual banao
-            bi_q = await make_bilingual_text(question)
-            bi_correct = await make_bilingual_text(correct_answer)
-            await asyncio.sleep(0.3)
+    # ── Mixed Test ───────────────────────────
+    if data == "mode_mixed":
+        await start_test(ctx, chat_id, mode="mixed", trigger_msg=query.message)
+        return
 
-            # 3 galat options lo
-            wrong_3 = await make_3_wrong_options(bi_q, bi_correct)
-            await asyncio.sleep(0.3)
-
-            # ✅ Sahi answer RANDOM position pe rakho — HUMNE KHUD
-            correct_pos = random.randint(0, 3)
-            options = wrong_3.copy()  # [w1, w2, w3]
-            options.insert(correct_pos, bi_correct)  # sahi answer insert
-            options = options[:4]  # exactly 4
-
-            polls.append({
-                "s": "GK / सामान्य ज्ञान",
-                "q": bi_q[:255],
-                "o": options,
-                "c": correct_pos  # ← 100% sahi! Humne khud rakha hai
-            })
-
-        except Exception as e:
-            print(f"Poll build error: {e}")
-            continue
-
-    return polls
-
-# ========== KEYBOARD ==========
-def main_kb():
-    return ReplyKeyboardMarkup([
-        [KeyboardButton("📝 Text Paste Karo"), KeyboardButton("📤 PDF Upload Karo")],
-        [KeyboardButton("▶️ Polls Start"),     KeyboardButton("⏹️ Polls Stop")],
-        [KeyboardButton("📊 Status"),          KeyboardButton("🗑️ Sab Delete Karo")]
-    ], resize_keyboard=True)
-
-# ========== BOT HANDLERS ==========
-
-@app.on_message(filters.command("start") & filters.private)
-async def start(client, message):
-    data = await gist_load()
-    await message.reply_text(
-        "🎓 **Sarkari Naukri Academy Bot**\n\n"
-        f"📊 Questions: **{len(data)}**\n"
-        f"🔄 Status: **{'Running ✅' if is_running() else 'Stopped ⏹️'}**\n"
-        f"⏱ Interval: **{TIMER} sec**\n"
-        f"💾 Storage: **{'GitHub Gist ✅' if GITHUB_TOKEN else 'Local ⚠️'}**\n\n"
-        "👇 Buttons:",
-        reply_markup=main_kb()
-    )
-
-@app.on_message(filters.regex("📝 Text Paste Karo") & filters.private & filters.user(ADMIN_ID))
-async def ask_text(client, message):
-    WAITING_TEXT[message.from_user.id] = True
-    await message.reply_text(
-        "✏️ **Text paste karo — koi bhi format:**\n\n"
-        "`Gadar Party ke sansthapak? – Lala Hardayal`\n"
-        "`Dandi March kab? – 12 March 1930`\n"
-        "`Bharat ki rajdhani? – New Delhi`\n\n"
-        "50+ questions ek saath de sakte ho!"
-    )
-
-@app.on_message(filters.regex("📤 PDF Upload Karo") & filters.private & filters.user(ADMIN_ID))
-async def ask_pdf(client, message):
-    await message.reply_text("📄 Ab PDF bhejien.")
-
-@app.on_message(filters.regex("▶️ Polls Start") & filters.private & filters.user(ADMIN_ID))
-async def polls_start(client, message):
-    set_running(True)
-    data = await gist_load()
-    await message.reply_text(f"✅ Polls shuru! Total: {len(data)} questions.")
-
-@app.on_message(filters.regex("⏹️ Polls Stop") & filters.private & filters.user(ADMIN_ID))
-async def polls_stop(client, message):
-    set_running(False)
-    await message.reply_text("⏹️ Polls rok diye.")
-
-@app.on_message(filters.regex("📊 Status") & filters.private & filters.user(ADMIN_ID))
-async def show_status(client, message):
-    data = await gist_load()
-    idx = get_idx()
-    await message.reply_text(
-        f"📊 **Bot Status**\n\n"
-        f"🔄 Polls: {'Running ✅' if is_running() else 'Stopped ⏹️'}\n"
-        f"❓ Total Questions: {len(data)}\n"
-        f"📍 Next Poll: #{idx+1}\n"
-        f"⏱ Interval: {TIMER} sec\n"
-        f"💾 Storage: {'GitHub Gist ✅' if GITHUB_TOKEN else 'Local ⚠️'}"
-    )
-
-@app.on_message(filters.regex("🗑️ Sab Delete Karo") & filters.private & filters.user(ADMIN_ID))
-async def delete_all(client, message):
-    await gist_save([])
-    set_idx(0)
-    await message.reply_text("🗑️ Saare questions delete ho gaye!")
-
-@app.on_message(
-    filters.text & filters.private & filters.user(ADMIN_ID) &
-    ~filters.command(["start"]) &
-    ~filters.regex("^(📝|📤|▶️|⏹️|📊|🗑️)")
-)
-async def handle_text_input(client, message):
-    if not WAITING_TEXT.get(message.from_user.id, False): return
-    WAITING_TEXT[message.from_user.id] = False
-    text = message.text.strip()
-    if len(text) < 5: return
-
-    st = await message.reply_text("⚙️ Processing...")
-    try:
-        lines = [l for l in text.split('\n') if l.strip()]
-        all_qs, chunk_size = [], 10
-        total_chunks = (len(lines) + chunk_size - 1) // chunk_size
-
-        for i in range(0, len(lines), chunk_size):
-            chunk = '\n'.join(lines[i:i+chunk_size])
-            cn = i//chunk_size + 1
-            await st.edit(f"⚙️ Processing {cn}/{total_chunks}...\n✅ Done: {len(all_qs)}")
-            qs = await build_polls_from_text(chunk)
-            all_qs.extend(qs)
-            await asyncio.sleep(1)
-
-        if not all_qs:
-            return await st.edit("❌ Questions nahi mile.\nFormat: `Sawal? – Jawab`")
-
-        total = await add_and_save(all_qs)
-        await st.edit(
-            f"✅ **{len(all_qs)} polls ready!**\n"
-            f"📊 Total saved: {total}\n"
-            f"✔️ Sahi answer 100% correct!\n"
-            f"💾 GitHub mein safe ✅"
+    # ── Subject List ─────────────────────────
+    if data == "mode_subject":
+        questions = _load_questions()
+        subjects  = get_subjects(questions)
+        if not subjects:
+            await query.message.reply_text("❌ Koi questions nahi. Pehle add karo.")
+            return
+        kb = [[InlineKeyboardButton(f"📌 {s}", callback_data=f"subject_{s}")] for s in subjects]
+        kb.append([InlineKeyboardButton("🔙 Back", callback_data="back_main")])
+        await query.message.reply_text(
+            "📚 *Subject choose karo:*",
+            reply_markup=InlineKeyboardMarkup(kb),
+            parse_mode="Markdown"
         )
-    except Exception as e:
-        await st.edit(f"❌ Error: {str(e)[:200]}")
+        return
 
-@app.on_message(filters.document & filters.user(ADMIN_ID) & filters.private)
-async def handle_pdf_upload(client, message):
-    if message.document.mime_type != "application/pdf":
-        return await message.reply_text("❌ Sirf PDF bhejien.")
-    st = await message.reply_text("⏳ PDF pad raha hoon...")
-    path = await message.download()
-    try:
-        doc = fitz.open(path)
-        raw = " ".join([p.get_text() for p in doc])
-        doc.close()
-        if len(raw.strip()) < 100:
-            return await st.edit("❌ PDF mein text nahi mila.")
-        cleaned = clean_text(raw)
-        chunks = split_chunks(cleaned, size=1200)
-        all_qs = []
-        for i, chunk in enumerate(chunks):
-            if len(chunk.strip()) < 50: continue
-            await st.edit(f"⚙️ Section {i+1}/{len(chunks)}\n✅ Questions: {len(all_qs)}")
-            try:
-                qs = await build_polls_from_text(chunk)
-                all_qs.extend(qs)
-                await asyncio.sleep(1)
-            except: await asyncio.sleep(3)
-        if not all_qs:
-            return await st.edit("❌ Koi question nahi bana.")
-        total = await add_and_save(all_qs)
-        await st.edit(
-            f"🎉 **PDF Done!**\n"
-            f"❓ Questions: {len(all_qs)}\n"
-            f"📊 Total: {total}\n"
-            f"✔️ Sahi answer 100% correct!\n"
-            f"💾 GitHub mein save ✅"
+    # ── Subject chosen ───────────────────────
+    if data.startswith("subject_"):
+        subject = data[len("subject_"):]
+        await start_test(ctx, chat_id, mode=subject, trigger_msg=query.message)
+        return
+
+    # ── AI Generate ──────────────────────────
+    if data == "ai_generate":
+        if user.id != ADMIN_ID:
+            await query.message.reply_text("❌ Sirf admin AI generate kar sakta hai.")
+            return
+        ctx.user_data["awaiting_ai_subject"] = True
+        await query.message.reply_text(
+            "🤖 *AI Question Generator*\n\n"
+            "Subject ka naam likho (Hindi ya English):\n"
+            "Example: `History`, `Science`, `Geography`, `Polity`",
+            parse_mode="Markdown"
         )
-    except Exception as e:
-        await st.edit(f"❌ Error: {str(e)[:200]}")
-    finally:
-        if os.path.exists(path): os.remove(path)
+        return
 
-# ========== 24x7 POLL LOOP ==========
-async def poll_loop():
-    while True:
+    # ── Add Q Help ───────────────────────────
+    if data == "addq_help":
+        if user.id != ADMIN_ID:
+            await query.message.reply_text("❌ Sirf admin.")
+            return
+        await cmd_addq(
+            type("obj", (object,), {
+                "message": query.message,
+                "effective_user": user
+            })(),
+            ctx
+        )
+        return
+
+    # ── Back to main ─────────────────────────
+    if data == "back_main":
+        await query.message.reply_text(
+            "Mode choose karo 👇",
+            reply_markup=main_keyboard()
+        )
+        return
+
+    # ── Delete all confirm ───────────────────
+    if data == "confirm_deleteall":
+        if user.id != ADMIN_ID:
+            return
+        github_write(QUESTIONS_FILE, [], "Admin: Delete all questions")
+        await query.message.reply_text("🗑 Saare questions delete ho gaye.")
+        return
+
+    if data == "cancel_delete":
+        await query.message.reply_text("✅ Cancel. Koi bhi question delete nahi hua.")
+        return
+
+# ════════════════════════════════════════════
+# MESSAGE HANDLER (Text)
+# ════════════════════════════════════════════
+
+async def message_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    text = (update.message.text or "").strip()
+
+    # ── Admin: AI subject input ──────────────
+    if user.id == ADMIN_ID and ctx.user_data.get("awaiting_ai_subject"):
+        ctx.user_data["awaiting_ai_subject"] = False
+        subject = text
+        await update.message.reply_text(f"🤖 AI se {subject} ke questions generate ho rahe hain...")
+
+        qs = groq_generate_questions(subject, count=10)
+        if not qs:
+            await update.message.reply_text("❌ AI se questions nahi mile. GROQ_KEY check karo.")
+            return
+
+        questions = _load_questions()
+        questions.extend(qs)
+        ok = github_write(QUESTIONS_FILE, questions, f"AI generated: {subject} questions")
+        if ok:
+            await update.message.reply_text(
+                f"✅ {len(qs)} AI questions add ho gaye!\n"
+                f"📊 Total: {len(questions)} questions"
+            )
+        else:
+            await update.message.reply_text("❌ GitHub save nahi hua. Token check karo.")
+        return
+
+    # ── Admin: Manual questions paste ────────
+    if user.id == ADMIN_ID and ctx.user_data.get("awaiting_questions"):
+        ctx.user_data["awaiting_questions"] = False
+        parsed = parse_questions_text(text)
+        if not parsed:
+            await update.message.reply_text(
+                "❌ Format galat hai.\n/addq command se dobara dekho."
+            )
+            return
+
+        questions = _load_questions()
+        questions.extend(parsed)
+        ok = github_write(QUESTIONS_FILE, questions, f"Added {len(parsed)} questions manually")
+        if ok:
+            await update.message.reply_text(
+                f"✅ {len(parsed)} questions add ho gaye!\n"
+                f"📊 Total: {len(questions)} questions\n"
+                f"💾 GitHub mein safe ✅"
+            )
+        else:
+            await update.message.reply_text("❌ GitHub save nahi hua.")
+        return
+
+    # Default
+    await update.message.reply_text(
+        "Menu ke liye /start dabao 👇",
+        reply_markup=main_keyboard()
+    )
+
+# ════════════════════════════════════════════
+# LOAD QUESTIONS (handles both formats)
+# ════════════════════════════════════════════
+
+def _load_questions() -> list:
+    """Load questions safely, handling dict or list format."""
+    data = github_read(QUESTIONS_FILE)
+    if isinstance(data, list):
+        return data
+    if isinstance(data, dict):
+        # Old format: {questions: [...]} or direct dict
+        return data.get("questions", [])
+    return []
+
+# ════════════════════════════════════════════
+# TEST FLOW
+# ════════════════════════════════════════════
+
+async def start_test(ctx: ContextTypes.DEFAULT_TYPE, chat_id: int, mode: str, trigger_msg=None):
+    if chat_id in active_tests:
+        await ctx.bot.send_message(
+            chat_id,
+            "⚠️ Ek test pehle se chal raha hai.\n/stoptest se band karo pehle."
+        )
+        return
+
+    questions_all = _load_questions()
+    if not questions_all:
+        await ctx.bot.send_message(chat_id, "❌ Koi questions nahi. Admin se contact karo.")
+        return
+
+    selected = select_questions(questions_all, mode, TOTAL_Q)
+    if not selected:
+        await ctx.bot.send_message(
+            chat_id,
+            f"❌ '{mode}' mein koi questions nahi hain.\n"
+            f"Pehle questions add karo."
+        )
+        return
+
+    active_tests[chat_id] = {
+        "questions":  selected,
+        "current":    0,
+        "poll_map":   {},    # poll_id -> q_index
+        "user_data":  {},    # user_id -> stats
+        "start_time": time.time(),
+        "mode":       mode,
+        "timer_task": None,
+        "sending":    False,
+    }
+
+    mode_label = "🔀 Mixed (सभी विषय)" if mode == "mixed" else f"📌 {mode}"
+    await ctx.bot.send_message(
+        chat_id,
+        f"🚀 *TEST SHURU HO GAYA!*\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📋 Mode: {mode_label}\n"
+        f"❓ Questions: {len(selected)}\n"
+        f"⏱ Time: {TEST_MINUTES} Minutes\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"✅ Sahi = +1 | ❌ Galat = Wrong count\n"
+        f"🔚 Test band karne ke liye: /stoptest\n\n"
+        f"*All the best! 🎯*",
+        parse_mode="Markdown"
+    )
+
+    # Start auto-end timer
+    task = asyncio.create_task(test_auto_end(ctx.application, chat_id))
+    active_tests[chat_id]["timer_task"] = task
+
+    # Start sending polls
+    asyncio.create_task(send_polls_loop(ctx.application, chat_id))
+
+
+async def test_auto_end(app, chat_id: int):
+    """Auto end test after TEST_SECONDS."""
+    await asyncio.sleep(TEST_SECONDS)
+    if chat_id in active_tests:
+        await app.bot.send_message(
+            chat_id,
+            f"⏰ *{TEST_MINUTES} minutes khatam!*\nTest band ho raha hai...",
+            parse_mode="Markdown"
+        )
+        await end_test(app, chat_id, forced=True)
+
+
+async def send_polls_loop(app, chat_id: int):
+    """Send all quiz polls one by one with TIMER interval."""
+    if chat_id not in active_tests:
+        return
+
+    session = active_tests[chat_id]
+    questions = session["questions"]
+
+    for idx in range(len(questions)):
+        if chat_id not in active_tests:
+            break  # Test was stopped
+
+        session = active_tests[chat_id]
+        session["current"] = idx
+        q = questions[idx]
+
+        q_text   = build_question_text(q, idx, len(questions))
+        options  = build_options(q)
+        ans_idx  = int(q.get("answer_index", 0))
+
+        # Clamp answer_index to valid range
+        ans_idx = max(0, min(ans_idx, len(options) - 1))
+
         try:
-            if is_running():
-                data = await gist_load()
-                if data:
-                    idx = get_idx()
-                    if idx >= len(data): idx = 0
-                    q = data[idx]
-                    await app.send_poll(
-                        CHAT_ID,
-                        f"📖 {q.get('s','GK')}\n\n{q['q']}",
-                        q['o'],
-                        is_anonymous=False,
-                        type="quiz",
-                        correct_option_id=q['c']
-                    )
-                    set_idx(idx + 1)
+            msg = await app.bot.send_poll(
+                chat_id=chat_id,
+                question=q_text,
+                options=options,
+                type=Poll.QUIZ,
+                correct_option_id=ans_idx,   # ✅ SIRF SAHI OPTION PAR TICK
+                is_anonymous=False,
+                open_period=min(TIMER, 600),
+            )
+            poll_id = str(msg.poll.id)
+            session["poll_map"][poll_id] = idx
         except Exception as e:
-            print(f"[POLL ERROR] {e}")
+            logger.error(f"Poll send error (Q{idx+1}): {e}")
+
+        # Wait before next poll
         await asyncio.sleep(TIMER)
 
-async def main():
-    Thread(target=run_server, daemon=True).start()
-    await app.start()
-    print("🚀 SNA Bot Online — 24x7!")
-    asyncio.create_task(poll_loop())
-    await idle()
+    # All polls sent
+    if chat_id in active_tests:
+        await app.bot.send_message(
+            chat_id,
+            "✅ Saare questions bhej diye gaye!\nThodi der mein result aayega...",
+        )
+        await asyncio.sleep(5)
+        await end_test(app, chat_id)
+
+# ════════════════════════════════════════════
+# POLL ANSWER HANDLER
+# ════════════════════════════════════════════
+
+async def poll_answer_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    ans     = update.poll_answer
+    poll_id = str(ans.poll_id)
+    user    = ans.user
+    uid     = str(user.id)
+    name    = user.full_name
+
+    for chat_id, session in list(active_tests.items()):
+        if poll_id not in session["poll_map"]:
+            continue
+
+        q_idx   = session["poll_map"][poll_id]
+        question = session["questions"][q_idx]
+        correct  = int(question.get("answer_index", 0))
+
+        # Init user
+        if uid not in session["user_data"]:
+            session["user_data"][uid] = {
+                "name":       name,
+                "correct":    0,
+                "wrong":      0,
+                "start_time": session["start_time"],
+                "last_time":  time.time(),
+            }
+
+        ud = session["user_data"][uid]
+        ud["name"]      = name
+        ud["last_time"] = time.time()
+
+        if ans.option_ids and ans.option_ids[0] == correct:
+            ud["correct"] += 1
+        else:
+            ud["wrong"] += 1
+        break
+
+# ════════════════════════════════════════════
+# END TEST
+# ════════════════════════════════════════════
+
+async def end_test(app, chat_id: int, forced: bool = False):
+    if chat_id not in active_tests:
+        return
+
+    session = active_tests.pop(chat_id)
+
+    # Cancel timer task if not forced
+    if not forced and session.get("timer_task"):
+        session["timer_task"].cancel()
+
+    user_data = session["user_data"]
+    if not user_data:
+        await app.bot.send_message(
+            chat_id,
+            "📊 Kisi ne participate nahi kiya."
+        )
+        return
+
+    # Sort: most correct first, then least time
+    results = sorted(
+        user_data.items(),
+        key=lambda x: (
+            -x[1]["correct"],
+            x[1]["last_time"] - x[1]["start_time"]
+        )
+    )
+
+    # Build result message
+    medals = {0: "🥇", 1: "🥈", 2: "🥉"}
+    lines  = [
+        "🏁 *TEST RESULT* 🏁",
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+    ]
+    for i, (uid, d) in enumerate(results[:20]):
+        medal   = medals.get(i, f"`{i+1}.`")
+        elapsed = d["last_time"] - d["start_time"]
+        total   = d["correct"] + d["wrong"]
+        acc     = round(d["correct"] / total * 100, 1) if total else 0
+        lines.append(
+            f"{medal} *{d['name']}*\n"
+            f"   ✅ Sahi: `{d['correct']}` | ❌ Galat: `{d['wrong']}`\n"
+            f"   ⏱ Time: `{fmt_time(elapsed)}` | 🎯 Accuracy: `{acc}%`"
+        )
+
+    lines.append("\n━━━━━━━━━━━━━━━━━━━━━━")
+    lines.append("🏆 Leaderboard ke liye /leaderboard")
+
+    await app.bot.send_message(
+        chat_id,
+        "\n".join(lines),
+        parse_mode="Markdown"
+    )
+
+    # ── Save scores to GitHub (SAFE — no overwrite of other files) ──
+    scores = github_read(SCORES_FILE)
+    if not isinstance(scores, dict):
+        scores = {}
+
+    for uid, d in user_data.items():
+        elapsed = d["last_time"] - d["start_time"]
+        total   = d["correct"] + d["wrong"]
+        acc_pct = round(d["correct"] / total * 100, 1) if total else 0
+
+        if uid not in scores:
+            scores[uid] = {
+                "name":              d["name"],
+                "total_score":       0,
+                "total_correct":     0,
+                "total_wrong":       0,
+                "tests_taken":       0,
+                "best_time":         99999,
+                "total_correct_pct": 0.0,
+            }
+
+        scores[uid]["name"]          = d["name"]
+        scores[uid]["total_score"]   += d["correct"]
+        scores[uid]["total_correct"] += d["correct"]
+        scores[uid]["total_wrong"]   += d["wrong"]
+        scores[uid]["tests_taken"]   += 1
+        scores[uid]["total_correct_pct"] = round(
+            scores[uid]["total_correct"] /
+            (scores[uid]["total_correct"] + scores[uid]["total_wrong"]) * 100, 1
+        )
+        if elapsed < scores[uid]["best_time"]:
+            scores[uid]["best_time"] = elapsed
+
+    ok = github_write(SCORES_FILE, scores, "Test result saved")
+    if ok:
+        await app.bot.send_message(chat_id, "💾 Scores GitHub mein save ho gaye! ✅")
+
+# ════════════════════════════════════════════
+# PARSE QUESTIONS FROM TEXT
+# ════════════════════════════════════════════
+
+def parse_questions_text(text: str) -> list:
+    """
+    Parse bilingual questions from text.
+    Supports both QH:/QE: (bilingual) and Q: (single language).
+    """
+    blocks  = text.strip().split("---")
+    parsed  = []
+    ans_map = {"A": 0, "B": 1, "C": 2, "D": 3}
+
+    for block in blocks:
+        block = block.strip()
+        if not block:
+            continue
+
+        d       = {"subject": "General", "options": []}
+        options = []
+
+        for line in block.split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            low = line.upper()
+
+            if low.startswith("SUBJECT:"):
+                d["subject"] = line.split(":", 1)[1].strip()
+            elif low.startswith("QH:"):
+                d["question_hi"] = line.split(":", 1)[1].strip()
+            elif low.startswith("QE:"):
+                d["question_en"] = line.split(":", 1)[1].strip()
+            elif low.startswith("Q:"):
+                # Single Q — store as both
+                q = line.split(":", 1)[1].strip()
+                d["question_hi"] = q
+                d["question_en"] = q
+            elif low.startswith("A:"):
+                options.append(line.split(":", 1)[1].strip())
+            elif low.startswith("B:"):
+                options.append(line.split(":", 1)[1].strip())
+            elif low.startswith("C:"):
+                options.append(line.split(":", 1)[1].strip())
+            elif low.startswith("D:"):
+                options.append(line.split(":", 1)[1].strip())
+            elif low.startswith("ANS:"):
+                ans = line.split(":", 1)[1].strip().upper()
+                d["answer_index"] = ans_map.get(ans, 0)
+
+        if ("question_hi" in d or "question_en" in d) and len(options) >= 2 and "answer_index" in d:
+            d["options"]  = options
+            d["question"] = d.get("question_hi") or d.get("question_en", "")
+            parsed.append(d)
+
+    return parsed
+
+# ════════════════════════════════════════════
+# MAIN
+# ════════════════════════════════════════════
+
+def main():
+    if not BOT_TOKEN:
+        logger.error("BOT_TOKEN not set!")
+        return
+
+    app = Application.builder().token(BOT_TOKEN).build()
+
+    # Commands
+    app.add_handler(CommandHandler("start",       cmd_start))
+    app.add_handler(CommandHandler("test",        cmd_start))
+    app.add_handler(CommandHandler("status",      cmd_status))
+    app.add_handler(CommandHandler("leaderboard", cmd_leaderboard))
+    app.add_handler(CommandHandler("stoptest",    cmd_stoptest))
+    app.add_handler(CommandHandler("addq",        cmd_addq))
+    app.add_handler(CommandHandler("deleteall",   cmd_deleteall))
+
+    # Handlers
+    app.add_handler(CallbackQueryHandler(callback_handler))
+    app.add_handler(PollAnswerHandler(poll_answer_handler))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
+
+    logger.info("✅ Sarkari Naukri Academy Bot chal raha hai...")
+    app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
 if __name__ == "__main__":
-    asyncio.get_event_loop().run_until_complete(main())
+    main()
