@@ -1,5 +1,6 @@
-pyrogram==2.0.106
-TgCrypto
+pyrogram
+tgcrypto
+aiohttp
 PyMuPDF
 groq
 flask
