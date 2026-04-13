@@ -1,6 +1,5 @@
-pyrogram
-tgcrypto
-pymupdf
-groq
+pyrogram==2.0.106
+TgCrypto
+PyMuPDF
+google-genai
 flask
-aiohttp
