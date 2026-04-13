@@ -1,6 +1,2 @@
-pyrogram==2.0.106
-tgcrypto
-pymupdf
-groq
-flask
-aiohttp
+python-telegram-bot==20.7
+requests==2.31.0
