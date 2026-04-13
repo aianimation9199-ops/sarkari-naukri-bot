@@ -1,241 +1,614 @@
+"""
+Sarkari Naukri Academy - Telegram Quiz Bot
+==========================================
+Features:
+- Subject-wise + Mixed quiz mode
+- 100 questions, 15 min timed test
+- Correct answer only gets ✅ tick
+- Wrong answer = Wrong count
+- Top 20 Leaderboard (score + time)
+- GitHub Gist storage (existing data safe)
+- Railway.app compatible
+"""
+
 import os
-import asyncio
 import json
-import re
-import random
-import fitz  # PyMuPDF
+import time
+import asyncio
+import requests
+import logging
 from datetime import datetime
-from groq import Groq
-from pyrogram import Client, filters, idle, handlers
-from pyrogram.types import ReplyKeyboardMarkup, KeyboardButton
-from flask import Flask
-from threading import Thread
+from telegram import (
+    Update, Poll, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
+)
+from telegram.ext import (
+    Application, CommandHandler, MessageHandler,
+    PollAnswerHandler, CallbackQueryHandler,
+    ContextTypes, filters
+)
 
-# --- CONFIGURATION (Railway Variables) ---
-API_ID = int(os.environ.get("API_ID", 0))
-API_HASH = os.environ.get("API_HASH", "")
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
-GROQ_API_KEY = os.environ.get("GROQ_KEY", "") 
-ADMIN_ID = int(os.environ.get("ADMIN_ID", 0))
-CHAT_ID = int(os.environ.get("CHAT_ID", 0))
-TIMER = int(os.environ.get("TIMER", 30))
+# ─────────────────────────────────────────────
+# CONFIG — Set these in Railway Environment Variables
+# ─────────────────────────────────────────────
+BOT_TOKEN       = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN")
+ADMIN_ID        = int(os.environ.get("ADMIN_ID", "123456789"))   # Your Telegram user ID
+GITHUB_TOKEN    = os.environ.get("GITHUB_TOKEN", "")             # GitHub Personal Access Token
+GIST_ID         = os.environ.get("GIST_ID", "")                  # Your GitHub Gist ID
+CHANNEL_ID      = os.environ.get("CHANNEL_ID", "@your_channel")  # Channel/Group username or ID
 
-# Local Storage
-DB_FILE = "quiz_data.json"
+# Quiz settings
+TOTAL_QUESTIONS  = 100     # Questions per test
+TEST_DURATION    = 15 * 60 # 15 minutes in seconds
+POLL_INTERVAL    = 8       # Seconds between polls during test
 
-# Clients Setup
-client_ai = Groq(api_key=GROQ_API_KEY)
-app = Client("SNA_PRO_FINAL", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
-server = Flask(__name__)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Global States
-IS_RUNNING = True
-IS_MEGA_TEST = False
-WAITING_TEXT = {}
-TEST_POLLS = {} # {poll_id: correct_index}
-USER_SCORES = {} # {user_id: {"c": 0, "w": 0, "n": ""}}
+# ─────────────────────────────────────────────
+# GITHUB GIST STORAGE
+# ─────────────────────────────────────────────
+GIST_HEADERS = {
+    "Authorization": f"token {GITHUB_TOKEN}",
+    "Accept": "application/vnd.github.v3+json"
+}
 
-@server.route('/')
-def home(): return "SNA Professional Bot is Healthy! 🚀", 200
-
-def run_server():
-    port = int(os.environ.get("PORT", 8080))
-    server.run(host='0.0.0.0', port=port)
-
-# ========== DATA MANAGEMENT ==========
-def load_db():
-    if os.path.exists(DB_FILE):
-        try:
-            with open(DB_FILE, "r", encoding='utf-8') as f: return json.load(f)
-        except: return []
-    return []
-
-def save_db(data):
-    with open(DB_FILE, "w", encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-# ========== GROQ BILINGUAL ENGINE ==========
-async def groq_extract_bilingual(text):
-    prompt = (
-        "You are a professional examiner. Extract exactly 20 high-quality MCQs from the text. "
-        "RULES:\n"
-        "1. Question and Options must be Bilingual (English / Hindi).\n"
-        "   Format: 'Question in English / हिंदी में सवाल? ❓'\n"
-        "2. Find the correct answer by looking for 'Ans - (A/B/C/D)' or 'Uttar:' in the text.\n"
-        "3. Provide the EXACT correct option text.\n"
-        "4. Output ONLY a JSON list: "
-        "[{\"q\": \"QE: ? / QH: ?\", \"o\": [\"A / अ\", \"B / ब\", \"C / स\", \"D / द\"], \"ans_txt\": \"Exact correct text\"}]."
-        f"\n\nText: {text[:9000]}"
-    )
+def gist_read(filename: str) -> dict | list:
+    """Read a JSON file from GitHub Gist. Returns empty dict/list on failure."""
     try:
-        r = client_ai.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"}
-        )
-        res = json.loads(r.choices[0].message.content)
-        raw_qs = res.get("questions", res) if isinstance(res, dict) else res
-        final_qs = []
-        for item in raw_qs:
-            opts, ans_text, c_idx = item['o'], item['ans_txt'], 0
-            # Accuracy Logic: Finding the correct text index manually
-            for i, o in enumerate(opts):
-                if ans_text.lower() in o.lower() or o.lower() in ans_text.lower():
-                    c_idx = i; break
-            final_qs.append({"q": item['q'], "o": opts, "c": c_idx})
-        return final_qs
+        r = requests.get(f"https://api.github.com/gists/{GIST_ID}", headers=GIST_HEADERS, timeout=10)
+        r.raise_for_status()
+        content = r.json()["files"].get(filename, {}).get("content", "{}")
+        return json.loads(content)
     except Exception as e:
-        print(f"Extraction Error: {e}")
-        return []
+        logger.error(f"Gist read error ({filename}): {e}")
+        return {}
 
-# ========== LEADERBOARD & RESULTS ==========
-async def publish_leaderboard():
-    global IS_MEGA_TEST, USER_SCORES, TEST_POLLS
-    if not USER_SCORES:
-        await app.send_message(CHAT_ID, "📊 **Test Alert:** Aaj koi bhagidar nahi mila.")
-    else:
-        # Rank sorting with 1/3 Negative Marking
-        leaderboard = []
-        for uid, s in USER_SCORES.items():
-            final_marks = s['c'] - (s['w'] * 0.33)
-            accuracy = (s['c'] / (s['c'] + s['w']) * 100) if (s['c'] + s['w']) > 0 else 0
-            leaderboard.append({"name": s['n'], "score": round(final_marks, 2), "perc": round(accuracy, 1), "c": s['c'], "w": s['w']})
-        
-        leaderboard = sorted(leaderboard, key=lambda x: x['score'], reverse=True)[:20]
-        
-        msg = "🏆 **SNA MEGA TEST FINAL RESULT** 🏆\n━━━━━━━━━━━━━━━━━━━━\n\n"
-        for i, r in enumerate(leaderboard, 1):
-            medal = "🥇" if i==1 else "🥈" if i==2 else "🥉" if i==3 else "🔹"
-            msg += f"{medal} **Rank {i}:** {r['name']}\n   ┗ Marks: **{r['score']}** | Sahi: {r['c']} | Galat: {r['w']}\n   ┗ Accuracy: {r['perc']}%\n\n"
-        
-        # Winner Motivation
-        winner = leaderboard[0]['name']
-        msg += f"✨ **Winner: {winner}!** ✨\n"
-        msg += "━━━━━━━━━━━━━━━━━━━━\n"
-        msg += "🎉 Welcome to my group! **और अच्छा से मेहनत करो और Government Job पाओ!** 👮‍♂️🔥"
-        await app.send_message(CHAT_ID, msg)
-
-    # Reset test data
-    IS_MEGA_TEST, USER_SCORES, TEST_POLLS = False, {}, {}
-
-# FIXED: AttributeError Fix for on_poll_answer
-async def handle_poll_ans(client, poll_answer):
-    global USER_SCORES
-    if not IS_MEGA_TEST: return
-    pid = poll_answer.poll_id
-    if pid not in TEST_POLLS: return
-    
-    uid = poll_answer.user.id
-    if uid not in USER_SCORES:
-        USER_SCORES[uid] = {"c": 0, "w": 0, "n": poll_answer.user.first_name or "Student"}
-    
-    if poll_answer.option_ids[0] == TEST_POLLS[pid]:
-        USER_SCORES[uid]["c"] += 1
-    else:
-        USER_SCORES[uid]["w"] += 1
-
-# ========== SCHEDULER (9, 12, 3, 5) ==========
-async def mega_test_scheduler():
-    while True:
-        now = datetime.now().strftime("%H:%M")
-        if now in ["09:00", "12:00", "15:00", "17:00"]:
-            global IS_MEGA_TEST, IS_RUNNING
-            IS_MEGA_TEST, IS_RUNNING = True, False
-            await app.send_message(CHAT_ID, f"🚨 **MEGA TEST START ({now})** 🚨\nBilingual Mode | Negative Marking (1/3) Active.")
-            
-            data = load_db()
-            if data:
-                test_set = random.sample(data, min(len(data), 100))
-                for q in test_set:
-                    poll = await app.send_poll(CHAT_ID, f"📖 GK MEGA TEST\n\n{q['q']}", q['o'], is_anonymous=False, type="quiz", correct_option_id=q['c'])
-                    TEST_POLLS[poll.id] = q['c']
-                    await asyncio.sleep(15) # Fast Mega Test Speed
-                
-                await asyncio.sleep(45); await publish_leaderboard()
-            IS_RUNNING = True
-        await asyncio.sleep(60)
-
-# ========== ALL 6 BUTTONS & COMMANDS ==========
-MAIN_KB = ReplyKeyboardMarkup([
-    [KeyboardButton("📝 Text Paste Karo"), KeyboardButton("📥 PDF Upload Karo")],
-    [KeyboardButton("▶️ Polls Start"), KeyboardButton("⏹️ Polls Stop")],
-    [KeyboardButton("📊 Status"), KeyboardButton("🗑️ Sab Delete Karo")]
-], resize_keyboard=True)
-
-@app.on_message(filters.command("start") & filters.private)
-async def start(c, m):
-    await m.reply_text("🎓 **Sarkari Naukri Academy PRO**\nAccuracy + Results fixed.", reply_markup=MAIN_KB)
-
-@app.on_message(filters.regex("📊 Status"))
-async def status(c, m):
-    data = load_db()
-    state = "Running ✅" if IS_RUNNING else "Stopped ⏹️"
-    await m.reply_text(f"📊 **Status**\nPolls: {state}\nQuestions: {len(data)}\nInterval: {TIMER}s")
-
-@app.on_message(filters.regex("⏹️ Polls Stop") & filters.user(ADMIN_ID))
-async def stop(c, m):
-    global IS_RUNNING
-    IS_RUNNING = False
-    await m.reply_text("⏹️ Polls rok diye gaye.")
-
-@app.on_message(filters.regex("▶️ Polls Start") & filters.user(ADMIN_ID))
-async def start_p(c, m):
-    global IS_RUNNING
-    IS_RUNNING = True
-    await m.reply_text("✅ Polls shuru ho gaye.")
-
-@app.on_message(filters.regex("📥 PDF Upload Karo") & filters.user(ADMIN_ID))
-async def pdf_req(c, m): await m.reply_text("📄 Ab apni PDF bhejien.")
-
-@app.on_message(filters.regex("📝 Text Paste Karo") & filters.user(ADMIN_ID))
-async def text_req(c, m):
-    WAITING_TEXT[m.from_user.id] = True
-    await m.reply_text("✏️ Text paste karein (Format: Sawal? - Jawab).")
-
-@app.on_message(filters.document & filters.user(ADMIN_ID))
-async def pdf_in(c, m):
-    st = await m.reply_text("⏳ Processing Accurate Bilingual Polls... ⚡")
-    path = await m.download()
+def gist_write(filename: str, data: dict | list):
+    """Write/update a single file in GitHub Gist without touching other files."""
     try:
-        doc = fitz.open(path)
-        text = " ".join([p.get_text() for p in doc]); doc.close()
-        new_qs = await groq_extract_bilingual(text)
-        data = load_db(); data.extend(new_qs); save_db(data)
-        await st.edit(f"✅ {len(new_qs)} Bilingual questions added safely!")
-    except: await st.edit("❌ Error processing PDF.")
-    if os.path.exists(path): os.remove(path)
+        payload = {"files": {filename: {"content": json.dumps(data, ensure_ascii=False, indent=2)}}}
+        r = requests.patch(f"https://api.github.com/gists/{GIST_ID}", headers=GIST_HEADERS,
+                           json=payload, timeout=10)
+        r.raise_for_status()
+        logger.info(f"Gist updated: {filename}")
+    except Exception as e:
+        logger.error(f"Gist write error ({filename}): {e}")
 
-@app.on_message(filters.regex("🗑️ Sab Delete Karo") & filters.user(ADMIN_ID))
-async def del_all(c, m):
-    save_db([])
-    await m.reply_text("🗑️ Saara data delete kar diya gaya.")
+# ─────────────────────────────────────────────
+# GIST FILE NAMES
+# ─────────────────────────────────────────────
+QUESTIONS_FILE  = "questions.json"    # [{question, options, answer_index, subject}, ...]
+SCORES_FILE     = "scores.json"       # {user_id: {name, total_score, tests_taken, best_time}}
+SESSIONS_FILE   = "sessions.json"     # Active test sessions
 
-# ========== MAIN LOOP ==========
-async def polling_loop():
-    idx = 0
-    while True:
-        if IS_RUNNING and not IS_MEGA_TEST:
-            try:
-                data = load_db()
-                if data:
-                    if idx >= len(data): idx = 0
-                    q = data[idx]
-                    await app.send_poll(CHAT_ID, f"📖 GK SPECIAL\n\n{q['q']}", q['o'], is_anonymous=False, type="quiz", correct_option_id=q['c'])
-                    idx += 1
-            except: pass
-        await asyncio.sleep(TIMER)
+# ─────────────────────────────────────────────
+# IN-MEMORY SESSION STATE
+# ─────────────────────────────────────────────
+# active_tests[chat_id] = {
+#   "questions": [...],       # Selected questions for this test
+#   "current": 0,             # Current question index
+#   "poll_id_map": {},        # poll_id -> question_index
+#   "user_answers": {},       # user_id -> {correct, wrong, time_start, time_end}
+#   "start_time": float,
+#   "mode": "mixed"|subject,
+#   "timer_task": asyncio.Task
+# }
+active_tests = {}
 
-async def start_everything():
-    Thread(target=run_server, daemon=True).start()
+# ─────────────────────────────────────────────
+# HELPERS
+# ─────────────────────────────────────────────
+
+def get_subjects(questions: list) -> list:
+    subjects = sorted(set(q.get("subject", "General") for q in questions))
+    return subjects
+
+def select_questions(questions: list, mode: str, count: int) -> list:
+    import random
+    if mode == "mixed":
+        pool = questions.copy()
+    else:
+        pool = [q for q in questions if q.get("subject", "General") == mode]
+    if len(pool) < count:
+        count = len(pool)
+    return random.sample(pool, count)
+
+def format_time(seconds: float) -> str:
+    m = int(seconds) // 60
+    s = int(seconds) % 60
+    return f"{m}m {s}s"
+
+def leaderboard_text(scores: dict, top_n: int = 20) -> str:
+    if not scores:
+        return "📊 Abhi koi score nahi hai."
     
-    # MANUAL HANDLER REGISTRATION to fix AttributeError
-    app.add_handler(handlers.PollAnswerHandler(handle_poll_ans))
+    sorted_scores = sorted(
+        scores.items(),
+        key=lambda x: (-x[1].get("total_score", 0), x[1].get("best_time", 9999))
+    )[:top_n]
     
-    await app.start()
-    print("🚀 SNA Pro Mega Bot Online!")
-    asyncio.create_task(polling_loop())
-    asyncio.create_task(mega_test_scheduler())
-    await idle()
+    medals = ["🥇","🥈","🥉"]
+    lines = ["🏆 *TOP LEADERBOARD* 🏆\n"]
+    for i, (uid, data) in enumerate(sorted_scores):
+        medal = medals[i] if i < 3 else f"{i+1}."
+        name = data.get("name", "Unknown")
+        score = data.get("total_score", 0)
+        best = format_time(data.get("best_time", 0))
+        tests = data.get("tests_taken", 0)
+        lines.append(f"{medal} *{name}*\n   ✅ Score: {score} | ⏱ Best: {best} | 📝 Tests: {tests}")
+    
+    return "\n".join(lines)
+
+# ─────────────────────────────────────────────
+# COMMANDS
+# ─────────────────────────────────────────────
+
+async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    keyboard = [
+        [InlineKeyboardButton("📝 Start Test (Mixed)", callback_data="mode_mixed")],
+        [InlineKeyboardButton("📚 Subject-wise Test", callback_data="mode_subject")],
+        [InlineKeyboardButton("🏆 Leaderboard", callback_data="leaderboard")],
+        [InlineKeyboardButton("📊 My Score", callback_data="myscore")],
+    ]
+    await update.message.reply_text(
+        "🎓 *Sarkari Naukri Academy Quiz Bot*\n\n"
+        "100 questions | ⏱ 15 minutes\n"
+        "Sahi answer = ✅ | Galat = ❌\n\n"
+        "Mode choose karo:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown"
+    )
+
+async def cmd_addq(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Admin: Add questions via text paste.
+    Format (one question per block):
+    SUBJECT: History
+    Q: Question text?
+    A: Option1
+    B: Option2
+    C: Option3
+    D: Option4
+    ANS: B
+    ---
+    """
+    if update.effective_user.id != ADMIN_ID:
+        await update.message.reply_text("❌ Sirf admin use kar sakta hai.")
+        return
+    
+    ctx.user_data["awaiting_questions"] = True
+    await update.message.reply_text(
+        "📝 Questions paste karo is format mein:\n\n"
+        "```\nSUBJECT: History\n"
+        "Q: Question yahan?\n"
+        "A: Option 1\nB: Option 2\nC: Option 3\nD: Option 4\n"
+        "ANS: B\n---\n```\n"
+        "Multiple questions ke beech `---` lagao.",
+        parse_mode="Markdown"
+    )
+
+async def cmd_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    questions = gist_read(QUESTIONS_FILE)
+    if not isinstance(questions, list):
+        questions = []
+    scores = gist_read(SCORES_FILE)
+    if not isinstance(scores, dict):
+        scores = {}
+    
+    subjects = get_subjects(questions)
+    subj_counts = {s: sum(1 for q in questions if q.get("subject") == s) for s in subjects}
+    subj_text = "\n".join(f"  📌 {s}: {c}" for s, c in subj_counts.items())
+    
+    active = len(active_tests)
+    text = (
+        f"📊 *Bot Status*\n\n"
+        f"❓ Total Questions: {len(questions)}\n"
+        f"👥 Total Users: {len(scores)}\n"
+        f"🔴 Active Tests: {active}\n\n"
+        f"*Subjects:*\n{subj_text or '  None'}\n\n"
+        f"💾 Storage: GitHub Gist ✅"
+    )
+    await update.message.reply_text(text, parse_mode="Markdown")
+
+async def cmd_leaderboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    scores = gist_read(SCORES_FILE)
+    if not isinstance(scores, dict):
+        scores = {}
+    await update.message.reply_text(leaderboard_text(scores), parse_mode="Markdown")
+
+async def cmd_stop_test(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    if chat_id in active_tests:
+        await end_test(ctx.application, chat_id, forced=True)
+        await update.message.reply_text("⏹ Test rok diya gaya.")
+    else:
+        await update.message.reply_text("Koi test chal nahi raha.")
+
+# ─────────────────────────────────────────────
+# CALLBACK HANDLER (Inline Buttons)
+# ─────────────────────────────────────────────
+
+async def callback_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+    chat_id = query.message.chat_id
+
+    if data == "leaderboard":
+        scores = gist_read(SCORES_FILE)
+        if not isinstance(scores, dict):
+            scores = {}
+        await query.message.reply_text(leaderboard_text(scores), parse_mode="Markdown")
+        return
+
+    if data == "myscore":
+        uid = str(query.from_user.id)
+        scores = gist_read(SCORES_FILE)
+        if not isinstance(scores, dict):
+            scores = {}
+        if uid in scores:
+            d = scores[uid]
+            text = (
+                f"📊 *Tumhara Score*\n\n"
+                f"👤 {d.get('name','?')}\n"
+                f"✅ Total Score: {d.get('total_score',0)}\n"
+                f"📝 Tests Liye: {d.get('tests_taken',0)}\n"
+                f"⏱ Best Time: {format_time(d.get('best_time',0))}"
+            )
+        else:
+            text = "Tumne abhi koi test nahi diya."
+        await query.message.reply_text(text, parse_mode="Markdown")
+        return
+
+    if data == "mode_mixed":
+        await start_test(update, ctx, chat_id, mode="mixed")
+        return
+
+    if data == "mode_subject":
+        questions = gist_read(QUESTIONS_FILE)
+        if not isinstance(questions, list):
+            questions = []
+        subjects = get_subjects(questions)
+        if not subjects:
+            await query.message.reply_text("❌ Koi questions nahi hain. Pehle questions add karo.")
+            return
+        keyboard = [[InlineKeyboardButton(s, callback_data=f"subject_{s}")] for s in subjects]
+        keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="back_start")])
+        await query.message.reply_text(
+            "📚 Subject choose karo:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+
+    if data.startswith("subject_"):
+        subject = data[len("subject_"):]
+        await start_test(update, ctx, chat_id, mode=subject)
+        return
+
+    if data == "back_start":
+        keyboard = [
+            [InlineKeyboardButton("📝 Start Test (Mixed)", callback_data="mode_mixed")],
+            [InlineKeyboardButton("📚 Subject-wise Test", callback_data="mode_subject")],
+            [InlineKeyboardButton("🏆 Leaderboard", callback_data="leaderboard")],
+            [InlineKeyboardButton("📊 My Score", callback_data="myscore")],
+        ]
+        await query.message.reply_text(
+            "Mode choose karo:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+
+# ─────────────────────────────────────────────
+# TEST FLOW
+# ─────────────────────────────────────────────
+
+async def start_test(update: Update, ctx: ContextTypes.DEFAULT_TYPE, chat_id: int, mode: str):
+    if chat_id in active_tests:
+        await ctx.bot.send_message(chat_id, "⚠️ Ek test pehle se chal raha hai. Pehle /stoptest karo.")
+        return
+
+    questions_all = gist_read(QUESTIONS_FILE)
+    if not isinstance(questions_all, list) or len(questions_all) == 0:
+        await ctx.bot.send_message(chat_id, "❌ Koi questions nahi hain. Admin se contact karo.")
+        return
+
+    selected = select_questions(questions_all, mode, TOTAL_QUESTIONS)
+    if len(selected) == 0:
+        await ctx.bot.send_message(chat_id, f"❌ '{mode}' subject mein koi questions nahi.")
+        return
+
+    active_tests[chat_id] = {
+        "questions": selected,
+        "current": 0,
+        "poll_id_map": {},         # poll_id (str) -> question_index
+        "user_answers": {},        # user_id -> {name, correct, wrong, start_time, end_time}
+        "start_time": time.time(),
+        "mode": mode,
+        "chat_id": chat_id,
+        "timer_task": None,
+    }
+
+    mode_text = "🔀 Mixed (All Subjects)" if mode == "mixed" else f"📚 {mode}"
+    await ctx.bot.send_message(
+        chat_id,
+        f"🚀 *TEST SHURU!*\n\n"
+        f"📋 Mode: {mode_text}\n"
+        f"❓ Questions: {len(selected)}\n"
+        f"⏱ Time: 15 minutes\n\n"
+        f"Har sahi answer = +1 | Galat = counted as wrong\n"
+        f"*All the best! 🎯*",
+        parse_mode="Markdown"
+    )
+
+    # Send first poll immediately, then schedule rest
+    await send_next_poll(ctx.application, chat_id)
+
+    # Start test timer — auto-end after 15 min
+    task = asyncio.create_task(test_timer(ctx.application, chat_id))
+    active_tests[chat_id]["timer_task"] = task
+
+async def test_timer(app, chat_id: int):
+    """Auto-end test after TEST_DURATION seconds."""
+    await asyncio.sleep(TEST_DURATION)
+    if chat_id in active_tests:
+        await app.bot.send_message(chat_id, "⏰ *15 minutes khatam!* Test automatically band ho raha hai...", parse_mode="Markdown")
+        await end_test(app, chat_id, forced=True)
+
+async def send_next_poll(app, chat_id: int):
+    """Send the next quiz poll in the active test."""
+    if chat_id not in active_tests:
+        return
+    
+    session = active_tests[chat_id]
+    idx = session["current"]
+    questions = session["questions"]
+    
+    if idx >= len(questions):
+        await end_test(app, chat_id)
+        return
+
+    q = questions[idx]
+    question_text = q.get("question", "Question?")
+    options = q.get("options", ["A", "B", "C", "D"])
+    correct_idx = int(q.get("answer_index", 0))
+
+    # Prefix with question number
+    full_question = f"Q{idx+1}/{len(questions)}: {question_text}"
+    if len(full_question) > 300:
+        full_question = full_question[:297] + "..."
+
+    try:
+        msg = await app.bot.send_poll(
+            chat_id=chat_id,
+            question=full_question,
+            options=options,
+            type=Poll.QUIZ,
+            correct_option_id=correct_idx,
+            is_anonymous=False,
+            open_period=POLL_INTERVAL + 2,  # Auto-close slightly after interval
+        )
+        poll_id = str(msg.poll.id)
+        session["poll_id_map"][poll_id] = idx
+        session["current"] += 1
+
+        # Schedule next poll
+        await asyncio.sleep(POLL_INTERVAL)
+        await send_next_poll(app, chat_id)
+
+    except Exception as e:
+        logger.error(f"Error sending poll: {e}")
+        await asyncio.sleep(2)
+        session["current"] += 1
+        await send_next_poll(app, chat_id)
+
+# ─────────────────────────────────────────────
+# POLL ANSWER HANDLER
+# ─────────────────────────────────────────────
+
+async def poll_answer_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    answer = update.poll_answer
+    poll_id = str(answer.poll_id)
+    user = answer.user
+    uid = str(user.id)
+    name = user.full_name
+
+    # Find which test this poll belongs to
+    for chat_id, session in active_tests.items():
+        if poll_id not in session["poll_id_map"]:
+            continue
+
+        q_idx = session["poll_id_map"][poll_id]
+        question = session["questions"][q_idx]
+        correct_idx = int(question.get("answer_index", 0))
+
+        # Init user tracking
+        if uid not in session["user_answers"]:
+            session["user_answers"][uid] = {
+                "name": name,
+                "correct": 0,
+                "wrong": 0,
+                "start_time": session["start_time"],
+                "end_time": None,
+            }
+
+        user_data = session["user_answers"][uid]
+        user_data["name"] = name  # Update name
+        user_data["end_time"] = time.time()  # Update last answer time
+
+        if answer.option_ids and answer.option_ids[0] == correct_idx:
+            user_data["correct"] += 1
+        else:
+            user_data["wrong"] += 1
+
+        break  # Found the session, stop searching
+
+# ─────────────────────────────────────────────
+# END TEST & SAVE SCORES
+# ─────────────────────────────────────────────
+
+async def end_test(app, chat_id: int, forced: bool = False):
+    if chat_id not in active_tests:
+        return
+
+    session = active_tests.pop(chat_id)
+
+    # Cancel timer if test ended naturally
+    if session.get("timer_task") and not forced:
+        session["timer_task"].cancel()
+
+    user_answers = session["user_answers"]
+    test_start = session["start_time"]
+
+    if not user_answers:
+        await app.bot.send_message(chat_id, "📊 Kisi ne bhi participate nahi kiya.")
+        return
+
+    # Sort by correct DESC, then time ASC
+    results = sorted(
+        user_answers.items(),
+        key=lambda x: (-x[1]["correct"], (x[1]["end_time"] or time.time()) - x[1]["start_time"])
+    )
+
+    # Build result message
+    medals = ["🥇","🥈","🥉"]
+    lines = ["🏁 *TEST RESULT* 🏁\n"]
+    for i, (uid, d) in enumerate(results[:20]):
+        medal = medals[i] if i < 3 else f"{i+1}."
+        elapsed = (d["end_time"] or time.time()) - d["start_time"]
+        lines.append(
+            f"{medal} *{d['name']}*\n"
+            f"   ✅ Sahi: {d['correct']} | ❌ Galat: {d['wrong']} | ⏱ Time: {format_time(elapsed)}"
+        )
+
+    await app.bot.send_message(chat_id, "\n".join(lines), parse_mode="Markdown")
+
+    # Save to GitHub Gist (safe update — don't overwrite other data)
+    scores = gist_read(SCORES_FILE)
+    if not isinstance(scores, dict):
+        scores = {}
+
+    for uid, d in user_answers.items():
+        elapsed = (d["end_time"] or time.time()) - d["start_time"]
+        if uid not in scores:
+            scores[uid] = {
+                "name": d["name"],
+                "total_score": 0,
+                "tests_taken": 0,
+                "best_time": 9999
+            }
+        scores[uid]["name"] = d["name"]
+        scores[uid]["total_score"] += d["correct"]
+        scores[uid]["tests_taken"] += 1
+        if elapsed < scores[uid]["best_time"]:
+            scores[uid]["best_time"] = elapsed
+
+    gist_write(SCORES_FILE, scores)
+    await app.bot.send_message(chat_id, "💾 Scores GitHub Gist mein save ho gaye! ✅")
+
+# ─────────────────────────────────────────────
+# ADD QUESTIONS VIA TEXT (Admin)
+# ─────────────────────────────────────────────
+
+async def message_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    text = update.message.text or ""
+
+    # Admin: add questions
+    if user.id == ADMIN_ID and ctx.user_data.get("awaiting_questions"):
+        ctx.user_data["awaiting_questions"] = False
+        parsed = parse_questions_text(text)
+        if not parsed:
+            await update.message.reply_text("❌ Format galat hai. /addq command se dobara try karo.")
+            return
+
+        questions = gist_read(QUESTIONS_FILE)
+        if not isinstance(questions, list):
+            questions = []
+        questions.extend(parsed)
+        gist_write(QUESTIONS_FILE, questions)
+        await update.message.reply_text(
+            f"✅ {len(parsed)} questions add ho gaye!\n"
+            f"📊 Total questions: {len(questions)}"
+        )
+        return
+
+    # Default: show menu
+    await cmd_start(update, ctx)
+
+def parse_questions_text(text: str) -> list:
+    """
+    Parse questions from text format:
+    SUBJECT: History
+    Q: Question?
+    A: Option1
+    B: Option2
+    C: Option3
+    D: Option4
+    ANS: B
+    ---
+    """
+    blocks = text.strip().split("---")
+    parsed = []
+    
+    for block in blocks:
+        block = block.strip()
+        if not block:
+            continue
+        
+        lines = block.split("\n")
+        data = {}
+        options = []
+        
+        for line in lines:
+            line = line.strip()
+            if line.upper().startswith("SUBJECT:"):
+                data["subject"] = line.split(":", 1)[1].strip()
+            elif line.upper().startswith("Q:"):
+                data["question"] = line.split(":", 1)[1].strip()
+            elif line.upper().startswith("A:"):
+                options.append(line.split(":", 1)[1].strip())
+            elif line.upper().startswith("B:"):
+                options.append(line.split(":", 1)[1].strip())
+            elif line.upper().startswith("C:"):
+                options.append(line.split(":", 1)[1].strip())
+            elif line.upper().startswith("D:"):
+                options.append(line.split(":", 1)[1].strip())
+            elif line.upper().startswith("ANS:"):
+                ans = line.split(":", 1)[1].strip().upper()
+                ans_map = {"A": 0, "B": 1, "C": 2, "D": 3}
+                data["answer_index"] = ans_map.get(ans, 0)
+        
+        if "question" in data and len(options) >= 2 and "answer_index" in data:
+            data["options"] = options
+            data.setdefault("subject", "General")
+            parsed.append(data)
+    
+    return parsed
+
+# ─────────────────────────────────────────────
+# MAIN
+# ─────────────────────────────────────────────
+
+def main():
+    app = Application.builder().token(BOT_TOKEN).build()
+
+    # Commands
+    app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(CommandHandler("addq", cmd_addq))
+    app.add_handler(CommandHandler("status", cmd_status))
+    app.add_handler(CommandHandler("leaderboard", cmd_leaderboard))
+    app.add_handler(CommandHandler("stoptest", cmd_stop_test))
+    
+    # Callbacks
+    app.add_handler(CallbackQueryHandler(callback_handler))
+    
+    # Poll answers
+    app.add_handler(PollAnswerHandler(poll_answer_handler))
+    
+    # Text messages
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
+
+    print("✅ Bot chal raha hai...")
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
-    asyncio.get_event_loop().run_until_complete(start_everything())
+    main()
