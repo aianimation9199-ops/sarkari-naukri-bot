@@ -1,6 +1,6 @@
 pyrogram
 tgcrypto
-aiohttp
-PyMuPDF
+pymupdf
 groq
 flask
+aiohttp
