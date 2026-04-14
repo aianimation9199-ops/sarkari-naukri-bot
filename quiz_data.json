@@ -177,5 +177,126 @@
       "Bhutan"
     ],
     "question": "भारत में सबसे ज्यादा सौर ऊर्जा (Solar Energy) का उत्पादन किस राज्य में होता है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "भारत में सबसे ज्यादा सौर ऊर्जा (Solar Energy) का उत्पादन किस राज्य में होता है?",
+    "question_en": "Which state produces the most solar energy in India?",
+    "answer_index": 1,
+    "options": [
+      "Gujarat",
+      "Rajasthan",
+      "Maharashtra",
+      "Tamil Nadu"
+    ],
+    "question": "भारत में सबसे ज्यादा सौर ऊर्जा (Solar Energy) का उत्पादन किस राज्य में होता है?"
+  },
+  {
+    "subject": "General",
+    "question_en": "In which state of India is 'Loktak Lake' located?",
+    "answer_index": 1,
+    "options": [
+      "Meghalaya",
+      "Manipur",
+      "Mizoram",
+      "Tripura"
+    ],
+    "question": "In which state of India is 'Loktak Lake' located?"
+  },
+  {
+    "subject": "General",
+    "question_en": "Which is the longest National Highway in India?",
+    "answer_index": 1,
+    "options": [
+      "NH 7",
+      "NH 44",
+      "NH 2",
+      "NH 10"
+    ],
+    "question": "Which is the longest National Highway in India?"
+  },
+  {
+    "subject": "General",
+    "question_en": "'Keibul Lamjao', the world's only floating national park, is located in?",
+    "answer_index": 1,
+    "options": [
+      "Assam",
+      "Manipur",
+      "Nagaland",
+      "Arunachal Pradesh"
+    ],
+    "question": "'Keibul Lamjao', the world's only floating national park, is located in?"
+  },
+  {
+    "subject": "General",
+    "question_en": "Which state of India is called 'Kohinoor'?",
+    "answer_index": 0,
+    "options": [
+      "Andhra Pradesh",
+      "Madhya Pradesh",
+      "Karnataka",
+      "Odisha"
+    ],
+    "question": "Which state of India is called 'Kohinoor'?"
+  },
+  {
+    "subject": "General",
+    "question_en": "Which river flows between Satpura and Vindhya ranges?",
+    "answer_index": 2,
+    "options": [
+      "Godavari",
+      "Tapti",
+      "Narmada",
+      "Mahi"
+    ],
+    "question": "Which river flows between Satpura and Vindhya ranges?"
+  },
+  {
+    "subject": "General",
+    "question_en": "'Operation Flood' is related to?",
+    "answer_index": 1,
+    "options": [
+      "Flood Control",
+      "Milk Production",
+      "Wheat Production",
+      "Water Conservation"
+    ],
+    "question": "'Operation Flood' is related to?"
+  },
+  {
+    "subject": "General",
+    "question_en": "Which is the largest rice-producing state in India?",
+    "answer_index": 2,
+    "options": [
+      "Uttar Pradesh",
+      "Bihar",
+      "West Bengal",
+      "Punjab"
+    ],
+    "question": "Which is the largest rice-producing state in India?"
+  },
+  {
+    "subject": "General",
+    "question_en": "In which state of India is 'Kanchenjunga' peak located?",
+    "answer_index": 2,
+    "options": [
+      "Uttarakhand",
+      "Himachal Pradesh",
+      "Sikkim",
+      "Arunachal Pradesh"
+    ],
+    "question": "In which state of India is 'Kanchenjunga' peak located?"
+  },
+  {
+    "subject": "General",
+    "question_en": "Where is the Khyber Pass located?",
+    "answer_index": 1,
+    "options": [
+      "India",
+      "Pakistan",
+      "Afghanistan",
+      "Bhutan"
+    ],
+    "question": "Where is the Khyber Pass located?"
   }
 ]
