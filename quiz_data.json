@@ -558,5 +558,135 @@
       "24"
     ],
     "question": "समांतर श्रेणी (A.P.) 2, 4, 6, 8... का 10वां पद क्या होगा?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "द्विघात समीकरण ax^2 + bx + c = 0 का विविक्तकर (Discriminant) क्या है?",
+    "question_en": "What is the discriminant of the quadratic equation ax^2 + bx + c = 0?",
+    "answer_index": 1,
+    "options": [
+      "b^2 + 4ac",
+      "b^2 - 4ac",
+      "\\sqrt{b^2 - 4ac}",
+      "2a"
+    ],
+    "question": "द्विघात समीकरण ax^2 + bx + c = 0 का विविक्तकर (Discriminant) क्या है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "यदि किसी संख्या का 20%, 50 है, तो वह संख्या क्या है?",
+    "question_en": "If 20% of a number is 50, what is the number?",
+    "answer_index": 1,
+    "options": [
+      "200",
+      "250",
+      "300",
+      "500"
+    ],
+    "question": "यदि किसी संख्या का 20%, 50 है, तो वह संख्या क्या है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "\\frac{d}{dx}(x^n) का मान क्या होता है?",
+    "question_en": "What is the value of \\frac{d}{dx}(x^n)?",
+    "answer_index": 1,
+    "options": [
+      "nx",
+      "nx^{n-1}",
+      "x^{n+1}",
+      "n^x"
+    ],
+    "question": "\\frac{d}{dx}(x^n) का मान क्या होता है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "एक समबाहु त्रिभुज का प्रत्येक कोण कितने डिग्री का होता है?",
+    "question_en": "Each angle of an equilateral triangle is of how many degrees?",
+    "answer_index": 1,
+    "options": [
+      "45°",
+      "60°",
+      "90°",
+      "120°"
+    ],
+    "question": "एक समबाहु त्रिभुज का प्रत्येक कोण कितने डिग्री का होता है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "5! (5 factorial) का मान क्या है?",
+    "question_en": "What is the value of 5! (5 factorial)?",
+    "answer_index": 1,
+    "options": [
+      "60",
+      "120",
+      "100",
+      "24"
+    ],
+    "question": "5! (5 factorial) का मान क्या है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "प्रथम पाँच विषम संख्याओं का औसत क्या होगा?",
+    "question_en": "What will be the average of the first five odd numbers?",
+    "answer_index": 1,
+    "options": [
+      "4",
+      "5",
+      "6",
+      "10"
+    ],
+    "question": "प्रथम पाँच विषम संख्याओं का औसत क्या होगा?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "बेलन (Cylinder) के वक्र पृष्ठीय क्षेत्रफल का सूत्र क्या है?",
+    "question_en": "What is the formula for the curved surface area of a cylinder?",
+    "answer_index": 1,
+    "options": [
+      "\\pi r^2h",
+      "2\\pi rh",
+      "2\\pi r(r+h)",
+      "\\frac{1}{3}\\pi r^2h"
+    ],
+    "question": "बेलन (Cylinder) के वक्र पृष्ठीय क्षेत्रफल का सूत्र क्या है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "यदि tan \\theta = 1 है, तो \\theta का मान क्या होगा?",
+    "question_en": "If tan \\theta = 1, what is the value of \\theta?",
+    "answer_index": 1,
+    "options": [
+      "30°",
+      "45°",
+      "60°",
+      "90°"
+    ],
+    "question": "यदि tan \\theta = 1 है, तो \\theta का मान क्या होगा?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "दो अभाज्य संख्याओं का महत्तम समापवर्तक (HCF) हमेशा क्या होता है?",
+    "question_en": "What is the HCF of two prime numbers always?",
+    "answer_index": 1,
+    "options": [
+      "0",
+      "1",
+      "उनका गुणनफल",
+      "उनका योग"
+    ],
+    "question": "दो अभाज्य संख्याओं का महत्तम समापवर्तक (HCF) हमेशा क्या होता है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "P(E) + P(\\bar{E}) (किसी घटना के होने और न होने की प्रायिकता का योग) कितना होता है?",
+    "question_en": "What is the sum of P(E) + P(\\bar{E})?",
+    "answer_index": 1,
+    "options": [
+      "0",
+      "1",
+      "0.5",
+      "अनिश्चित"
+    ],
+    "question": "P(E) + P(\\bar{E}) (किसी घटना के होने और न होने की प्रायिकता का योग) कितना होता है?"
   }
 ]
