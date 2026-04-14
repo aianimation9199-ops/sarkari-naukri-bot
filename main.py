@@ -1,99 +1,77 @@
 """
 SARKARI NAUKRI ACADEMY — QUIZ BOT v7.0
-Changes v7.0:
- - 100 questions in 10 minutes (6 seconds per question)
- - Polls go to GROUP (CHAT_ID), not DM
- - Menu as bottom ReplyKeyboard buttons
- - Auto-schedule polls at 9:00, 12:00, 15:00, 20:00 (IST)
-Railway Variables: BOT_TOKEN, ADMIN_ID, CHAT_ID,
-                   GITHUB_TOKEN, GIST_ID, GROQ_KEY
+=======================================
+FEATURES:
+1. Auto test at fixed times: 09:00, 12:00, 03:00, 08:00 (IST)
+2. 100 questions per test
+3. Per-question time: 6 seconds (test mode) / 60 seconds (normal polls)
+4. Test duration: 10 minutes total
+5. Bot buttons: Text Paste, Polls Start/Stop, Auto Save, Mixed/Subject Test, PDF, AI, Leaderboard, Score, Status
+6. Subject-wise auto-detect from text
+7. Auto scheduled tests
+8. Full rank result in GROUP after test ends
+9. Result auto-delete after 2 hours, new test data fresh
+10. Normal polls = 1 min per Q; Test mode = 6 sec per Q, 100Q, 10 min
+11. All functions working
+12. Questions sent to TELEGRAM GROUP (CHAT_ID), not just bot DM
+13. Hindi + English bilingual questions & options
+14. Correct answer = green tick, wrong = red cross (Telegram Quiz Poll)
+
+Railway Variables:
+  BOT_TOKEN, ADMIN_ID, CHAT_ID, GITHUB_TOKEN, GIST_ID, GROQ_KEY, TIMER
 """
 
 import os, json, time, asyncio, logging, random, re, base64
 from datetime import datetime, timezone, timedelta
 import requests
 
-from telegram import (
-    Update, Poll, InlineKeyboardButton, InlineKeyboardMarkup,
-    ReplyKeyboardMarkup, KeyboardButton,
-)
+from telegram import Update, Poll, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
     PollAnswerHandler, CallbackQueryHandler,
     ContextTypes, filters,
 )
 
-# ── Logging ──────────────────────────────────────────
+# ── Logging ──────────────────────────────────────────────
 logging.basicConfig(format="%(asctime)s [%(levelname)s] %(message)s", level=logging.INFO)
 log = logging.getLogger(__name__)
 
-# ── Config ───────────────────────────────────────────
+# ── Config ───────────────────────────────────────────────
 BOT_TOKEN    = os.environ.get("BOT_TOKEN", "")
 ADMIN_ID     = int(os.environ.get("ADMIN_ID", "0"))
-CHAT_ID      = os.environ.get("CHAT_ID", "")          # Telegram Group chat id
+CHAT_ID      = os.environ.get("CHAT_ID", "")          # Telegram GROUP where tests go
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 GIST_ID      = os.environ.get("GIST_ID", "")
 GROQ_KEY     = os.environ.get("GROQ_KEY", "")
+TIMER        = int(os.environ.get("TIMER", "60"))      # Normal poll interval (seconds)
 
 GH_USER   = "aianimation9199-ops"
 GH_REPO   = "sarkari-naukri-bot"
 GH_BRANCH = "main"
 
-TOTAL_Q        = 100
-Q_TIME_SEC     = 6           # 6 seconds per question
-TEST_MIN       = 10          # Total 10 minutes
-TEST_SEC       = TEST_MIN * 60
+# Test settings
+TOTAL_Q        = 100           # Questions per test
+TEST_Q_TIME    = 6             # Seconds per question in TEST mode
+TEST_DURATION  = 10 * 60       # 10 minutes total test
 
-# Auto-schedule times (IST = UTC+5:30) — hour, minute
-SCHEDULE_TIMES = [(9, 0), (12, 0), (15, 0), (20, 0)]
+# Auto test times in IST (24h format)
+AUTO_TEST_HOURS_IST = [9, 12, 15, 20]   # 09:00, 12:00, 15:00, 20:00 IST
 
-Q_FILE    = "quiz_data.json"
-S_FILE    = "scores.json"
-CFG_FILE  = "bot_config.json"
+# IST offset
+IST = timezone(timedelta(hours=5, minutes=30))
 
-_cache = {}
+Q_FILE   = "quiz_data.json"
+S_FILE   = "scores.json"
+CFG_FILE = "bot_config.json"
 
-# ════════════════════════════════════════════════════
-# KEYBOARD HELPERS
-# ════════════════════════════════════════════════════
+# In-memory cache
+_cache: dict = {}
 
-def bottom_kb():
-    """Bottom ReplyKeyboard for admin — shows in message bar"""
-    return ReplyKeyboardMarkup(
-        [
-            [KeyboardButton("📝 Mixed Test (सभी विषय)"), KeyboardButton("📚 Subject-wise Test")],
-            [KeyboardButton("▶️ Polls Start"),            KeyboardButton("⏹ Polls Stop")],
-            [KeyboardButton("📄 PDF Upload कर"),          KeyboardButton("📋 Text Paste करो")],
-            [KeyboardButton("🤖 AI Questions बनाओ")],
-            [KeyboardButton("🏆 Leaderboard"),            KeyboardButton("📊 My Score")],
-            [KeyboardButton("📈 Status"),                 KeyboardButton("🗑 Sab Delete")],
-        ],
-        resize_keyboard=True,
-        one_time_keyboard=False,
-    )
+# ════════════════════════════════════════════════════════
+# GITHUB STORAGE
+# ════════════════════════════════════════════════════════
 
-def user_bottom_kb():
-    """Bottom ReplyKeyboard for normal users"""
-    return ReplyKeyboardMarkup(
-        [
-            [KeyboardButton("🏆 Leaderboard"), KeyboardButton("📊 My Score")],
-            [KeyboardButton("📈 Status")],
-        ],
-        resize_keyboard=True,
-        one_time_keyboard=False,
-    )
-
-def inline_subj_kb(qs):
-    sub = subjects(qs)
-    kb = [[InlineKeyboardButton(f"📌 {s}", callback_data=f"s_{s}")] for s in sub]
-    kb.append([InlineKeyboardButton("🔙 Back", callback_data="back")])
-    return InlineKeyboardMarkup(kb)
-
-# ════════════════════════════════════════════════════
-# GITHUB HELPERS
-# ════════════════════════════════════════════════════
-
-def _gh_headers():
+def _gh_hdr():
     return {
         "Authorization": f"token {GITHUB_TOKEN}",
         "Accept": "application/vnd.github.v3+json",
@@ -101,8 +79,9 @@ def _gh_headers():
 
 def gh_read(fname):
     try:
-        url = f"https://api.github.com/repos/{GH_USER}/{GH_REPO}/contents/{fname}"
-        r = requests.get(url, headers=_gh_headers(), timeout=15)
+        r = requests.get(
+            f"https://api.github.com/repos/{GH_USER}/{GH_REPO}/contents/{fname}",
+            headers=_gh_hdr(), timeout=15)
         if r.status_code == 404:
             return _cache.get(fname, [])
         r.raise_for_status()
@@ -114,369 +93,204 @@ def gh_read(fname):
         return _cache.get(fname, [])
 
 def gh_write(fname, data, msg="bot update"):
+    """Safe write — only this file changes, others untouched."""
     _cache[fname] = data
     if not GITHUB_TOKEN:
-        return False, "GITHUB_TOKEN not set in Railway variables"
+        return False, "GITHUB_TOKEN not set"
     url = f"https://api.github.com/repos/{GH_USER}/{GH_REPO}/contents/{fname}"
-    hdr = _gh_headers()
     sha = None
     try:
-        r = requests.get(url, headers=hdr, timeout=10)
+        r = requests.get(url, headers=_gh_hdr(), timeout=10)
         if r.status_code == 200:
             sha = r.json().get("sha")
         elif r.status_code == 401:
-            return False, "Token invalid ya expired"
+            return False, "Token invalid/expired — Railway mein naya GITHUB_TOKEN daalo"
         elif r.status_code == 403:
             return False, "Token ko 'repo' write permission nahi"
     except Exception as e:
         return False, f"Network error: {e}"
 
-    content_b64 = base64.b64encode(
-        json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
-    ).decode()
-    payload = {"message": msg, "content": content_b64, "branch": GH_BRANCH}
+    payload = {
+        "message": msg,
+        "content": base64.b64encode(
+            json.dumps(data, ensure_ascii=False, indent=2).encode()
+        ).decode(),
+        "branch": GH_BRANCH,
+    }
     if sha:
         payload["sha"] = sha
     try:
-        r = requests.put(url, headers=hdr, json=payload, timeout=20)
+        r = requests.put(url, headers=_gh_hdr(), json=payload, timeout=20)
         if r.status_code in (200, 201):
             return True, ""
-        return False, f"HTTP {r.status_code}: {r.text[:100]}"
+        elif r.status_code == 401:
+            return False, "Token expired"
+        elif r.status_code == 403:
+            return False, "No write permission"
+        else:
+            return False, f"HTTP {r.status_code}"
     except Exception as e:
-        return False, f"Network error: {e}"
+        return False, f"Error: {e}"
 
 def gist_bak(data):
     if not GIST_ID: return
     try:
         requests.patch(
             f"https://api.github.com/gists/{GIST_ID}",
-            headers=_gh_headers(),
+            headers=_gh_hdr(),
             json={"files": {"scores.json": {
                 "content": json.dumps(data, ensure_ascii=False, indent=2)
             }}}, timeout=10)
     except Exception:
         pass
 
-def check_github_token():
+def gh_token_ok():
     if not GITHUB_TOKEN:
-        return False, "GITHUB_TOKEN set nahi hai Railway mein"
+        return False, "GITHUB_TOKEN not set"
     try:
         r = requests.get(
             f"https://api.github.com/repos/{GH_USER}/{GH_REPO}",
-            headers=_gh_headers(), timeout=10)
-        if r.status_code == 200:   return True,  "GitHub connection OK ✅"
-        elif r.status_code == 401: return False, "Token invalid/expired ❌"
-        elif r.status_code == 403: return False, "Token permission nahi ❌"
-        elif r.status_code == 404: return False, f"Repo '{GH_USER}/{GH_REPO}' nahi mila ❌"
-        return False, f"HTTP {r.status_code} ❌"
+            headers=_gh_hdr(), timeout=10)
+        if r.status_code == 200: return True, "✅ GitHub OK"
+        if r.status_code == 401: return False, "❌ Token invalid/expired"
+        if r.status_code == 403: return False, "❌ No permission"
+        if r.status_code == 404: return False, f"❌ Repo not found"
+        return False, f"❌ HTTP {r.status_code}"
     except Exception as e:
-        return False, f"Network error: {e}"
+        return False, f"❌ {e}"
 
-# ════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════
 # DATA HELPERS
-# ════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════
 
-def load_qs():
+def load_qs() -> list:
     d = gh_read(Q_FILE)
     if isinstance(d, list): return d
     if isinstance(d, dict): return d.get("questions", [])
     return []
 
-def load_sc():
+def load_sc() -> dict:
     d = gh_read(S_FILE)
     return d if isinstance(d, dict) else {}
 
-def subjects(qs):
+def load_cfg() -> dict:
+    d = gh_read(CFG_FILE)
+    if isinstance(d, dict): return d
+    return {"auto_enabled": True, "current_index": 0}
+
+def save_cfg(cfg):
+    gh_write(CFG_FILE, cfg, "cfg update")
+
+def get_subjects(qs: list) -> list:
     return sorted({q.get("subject", "General") for q in qs})
 
-def pick(qs, mode, n):
+def pick_qs(qs: list, mode: str, n: int) -> list:
     pool = qs if mode == "mixed" else [q for q in qs if q.get("subject","General") == mode]
     return random.sample(pool, min(n, len(pool)))
 
-def ft(sec):
+def fmt_time(sec: float) -> str:
     return f"{int(sec)//60}m {int(sec)%60}s"
 
-def qtxt(q, i, total):
+def now_ist() -> datetime:
+    return datetime.now(IST)
+
+def q_text(q: dict, i: int, total: int) -> str:
     hi = q.get("question_hi") or q.get("question", "")
     en = q.get("question_en", "")
-    body = (f"{hi}\n{en}" if hi and en and hi != en else hi or en or "?")
+    if hi and en and hi.strip() != en.strip():
+        body = f"{hi}\n{en}"
+    else:
+        body = hi or en or "?"
     return (f"Q{i+1}/{total}: " + body)[:300]
 
-def qopts(q):
+def q_opts(q: dict) -> list:
     return [str(o)[:100] for o in q.get("options", ["A","B","C","D"])[:10]]
 
-def lb_msg(scores, top=20):
-    if not scores: return "📊 Koi score nahi hai abhi."
+def lb_text(scores: dict, top: int = 20) -> str:
+    if not scores:
+        return "📊 Koi score nahi hai abhi."
     ranked = sorted(scores.items(),
-        key=lambda x: (-x[1].get("total_score",0), x[1].get("best_time",99999)))[:top]
-    medals = {0:"🥇",1:"🥈",2:"🥉"}
-    lines = ["🏆 *TOP LEADERBOARD* 🏆","━━━━━━━━━━━━━━━━━━━━━━\n"]
-    for i,(uid,d) in enumerate(ranked):
-        c=d.get("total_correct",0); w=d.get("total_wrong",0)
-        acc = round(c/(c+w)*100,1) if c+w else 0
+        key=lambda x: (-x[1].get("total_score", 0), x[1].get("best_time", 99999)))[:top]
+    medals = {0:"🥇", 1:"🥈", 2:"🥉"}
+    lines = ["🏆 *TOP LEADERBOARD* 🏆", "━━━━━━━━━━━━━━━━━━━━━━\n"]
+    for i, (uid, d) in enumerate(ranked):
+        c = d.get("total_correct", 0); w = d.get("total_wrong", 0)
+        acc = round(c/(c+w)*100, 1) if c+w else 0
         lines.append(
-            f"{medals.get(i,str(i+1)+'.')} *{d.get('name','?')}*\n"
-            f"   ✅`{c}` ❌`{w}` ⏱`{ft(d.get('best_time',0))}` 🎯`{acc}%`")
+            f"{medals.get(i, str(i+1)+'.')} *{d.get('name','?')}*\n"
+            f"   ✅`{c}` ❌`{w}` ⏱`{fmt_time(d.get('best_time',0))}` 🎯`{acc}%`\n"
+            f"   📝Tests:`{d.get('tests_taken',0)}`")
     lines.append("\n━━━━━━━━━━━━━━━━━━━━━━")
     return "\n".join(lines)
 
-# ════════════════════════════════════════════════════
-# ACTIVE SESSIONS
-# ════════════════════════════════════════════════════
-sess = {}
+# ════════════════════════════════════════════════════════
+# KEYBOARDS
+# ════════════════════════════════════════════════════════
 
-# ════════════════════════════════════════════════════
-# TEST FLOW  (polls always go to GROUP = CHAT_ID)
-# ════════════════════════════════════════════════════
+def main_kb():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("📝 Mixed Test",          callback_data="mode_mixed"),
+         InlineKeyboardButton("📚 Subject Test",        callback_data="mode_subj")],
+        [InlineKeyboardButton("▶️ Polls Start",         callback_data="polls_start"),
+         InlineKeyboardButton("⏹ Polls Stop",           callback_data="polls_stop")],
+        [InlineKeyboardButton("📋 Text Paste",          callback_data="text_help"),
+         InlineKeyboardButton("📄 PDF Upload",          callback_data="pdf_help")],
+        [InlineKeyboardButton("🤖 AI Questions",        callback_data="ai_gen"),
+         InlineKeyboardButton("💾 Auto Save ON/OFF",    callback_data="toggle_auto")],
+        [InlineKeyboardButton("🏆 Leaderboard",         callback_data="lb"),
+         InlineKeyboardButton("📊 My Score",            callback_data="me")],
+        [InlineKeyboardButton("📈 Status",              callback_data="stat"),
+         InlineKeyboardButton("🗑 Sab Delete",          callback_data="ask_del")],
+        [InlineKeyboardButton("🔧 GitHub Check",        callback_data="gh_check")],
+    ])
 
-async def begin(app_or_ctx, cid, mode, *, app=None):
-    """Start a quiz session.
-    Can be called with (ctx, cid, mode) from handlers
-    or (app, cid, mode, app=app) from scheduler.
-    """
-    bot = (app or app_or_ctx.application).bot if app else app_or_ctx.application.bot
+# ════════════════════════════════════════════════════════
+# ACTIVE STATE
+# ════════════════════════════════════════════════════════
+# sess[chat_id] = {questions, poll_map, user_data, start_time, mode, timer_task, result_msg_ids}
+sess: dict = {}
+# result_msgs[chat_id] = [msg_id, ...] — for auto-delete after 2h
+result_msgs: dict = {}
 
-    group_cid = int(CHAT_ID) if CHAT_ID else cid
-
-    if group_cid in sess:
-        await bot.send_message(group_cid, "⚠️ Test chal raha hai. /stoptest se band karo.")
-        return
-    all_qs = load_qs()
-    selected = pick(all_qs, mode, TOTAL_Q)
-    if not selected:
-        await bot.send_message(group_cid, "❌ Questions nahi hain.\n📋 Text Paste se add karo.")
-        return
-
-    sess[group_cid] = {
-        "questions": selected, "poll_map": {},
-        "user_data": {}, "start_time": time.time(),
-        "mode": mode, "timer_task": None,
-    }
-    label = "🔀 Mixed (सभी विषय)" if mode == "mixed" else f"📌 {mode}"
-    the_app = app or app_or_ctx.application
-    await bot.send_message(
-        group_cid,
-        f"🚀 *TEST SHURU!*\n━━━━━━━━━━━━━━━━━\n"
-        f"📋 {label}\n❓ {len(selected)} Questions\n⏱ {TEST_MIN} Minutes\n"
-        f"⏲ Har question: {Q_TIME_SEC} seconds\n"
-        f"━━━━━━━━━━━━━━━━━\n✅ Sahi = +1 | ❌ Galat = counted\n"
-        f"*All the best! 🎯*",
-        parse_mode="Markdown")
-
-    task = asyncio.create_task(_auto_end(the_app, group_cid))
-    sess[group_cid]["timer_task"] = task
-    asyncio.create_task(_send_polls(the_app, group_cid))
-
-async def _auto_end(app, cid):
-    await asyncio.sleep(TEST_SEC)
-    if cid in sess:
-        await app.bot.send_message(
-            cid, f"⏰ *{TEST_MIN} min khatam!* Result aa raha hai...", parse_mode="Markdown")
-        await end_test(app, cid, forced=True)
-
-async def _send_polls(app, cid):
-    if cid not in sess: return
-    s = sess[cid]; total = len(s["questions"])
-    for i, q in enumerate(s["questions"]):
-        if cid not in sess: return
-        text = qtxt(q, i, total)
-        opts = qopts(q)
-        ans  = max(0, min(int(q.get("answer_index",0)), len(opts)-1))
-        try:
-            msg = await app.bot.send_poll(
-                chat_id=cid,
-                question=text,
-                options=opts,
-                type=Poll.QUIZ,
-                correct_option_id=ans,
-                is_anonymous=False,
-                open_period=max(Q_TIME_SEC, 5),   # min 5s (Telegram limit)
-            )
-            sess[cid]["poll_map"][str(msg.poll.id)] = i
-        except Exception as e:
-            log.error("Poll Q%d: %s", i+1, e)
-        await asyncio.sleep(Q_TIME_SEC)
-
-    if cid in sess:
-        await app.bot.send_message(cid, "✅ Saare questions ho gaye! Result aa raha hai...")
-        await asyncio.sleep(5)
-        await end_test(app, cid)
-
-async def on_poll_ans(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    pa = u.poll_answer; pid = str(pa.poll_id)
-    user = pa.user; uid = str(user.id)
-    for cid, s in list(sess.items()):
-        if pid not in s["poll_map"]: continue
-        qi = s["poll_map"][pid]
-        correct = int(s["questions"][qi].get("answer_index",0))
-        if uid not in s["user_data"]:
-            s["user_data"][uid] = {
-                "name": user.full_name, "correct": 0, "wrong": 0,
-                "start_time": s["start_time"], "last_time": time.time(),
-            }
-        ud = s["user_data"][uid]
-        ud["name"] = user.full_name; ud["last_time"] = time.time()
-        if pa.option_ids and pa.option_ids[0] == correct:
-            ud["correct"] += 1
-        else:
-            ud["wrong"] += 1
-        break
-
-async def end_test(app, cid, forced=False):
-    if cid not in sess: return
-    s = sess.pop(cid)
-    if not forced and s.get("timer_task"):
-        s["timer_task"].cancel()
-    ud = s["user_data"]
-    if not ud:
-        await app.bot.send_message(cid, "📊 Kisi ne participate nahi kiya."); return
-
-    ranked = sorted(ud.items(),
-        key=lambda x: (-x[1]["correct"], x[1]["last_time"]-x[1]["start_time"]))
-    medals = {0:"🥇",1:"🥈",2:"🥉"}
-    lines = ["🏁 *TEST RESULT* 🏁","━━━━━━━━━━━━━━━━━━━━━━\n"]
-    for i,(uid,d) in enumerate(ranked[:20]):
-        el = d["last_time"]-d["start_time"]
-        tot = d["correct"]+d["wrong"]
-        acc = round(d["correct"]/tot*100,1) if tot else 0
-        lines.append(
-            f"{medals.get(i,str(i+1)+'.')} *{d['name']}*\n"
-            f"   ✅`{d['correct']}` ❌`{d['wrong']}` ⏱`{ft(el)}` 🎯`{acc}%`")
-    lines += ["\n━━━━━━━━━━━━━━━━━━━━━━","🏆 /leaderboard"]
-    await app.bot.send_message(cid, "\n".join(lines), parse_mode="Markdown")
-
-    scores = load_sc()
-    for uid, d in ud.items():
-        el = d["last_time"]-d["start_time"]
-        tot = d["correct"]+d["wrong"]
-        if uid not in scores:
-            scores[uid] = {"name":"","total_score":0,"total_correct":0,
-                           "total_wrong":0,"tests_taken":0,"best_time":99999,"accuracy":0.0}
-        s2 = scores[uid]
-        s2["name"]=d["name"]; s2["total_score"]+=d["correct"]
-        s2["total_correct"]+=d["correct"]; s2["total_wrong"]+=d["wrong"]
-        s2["tests_taken"]+=1
-        if el < s2["best_time"]: s2["best_time"]=round(el,1)
-        tot2=s2["total_correct"]+s2["total_wrong"]
-        s2["accuracy"]=round(s2["total_correct"]/tot2*100,1) if tot2 else 0
-
-    ok, err = gh_write(S_FILE, scores, "Scores updated")
-    if ok:
-        gist_bak(scores)
-        await app.bot.send_message(cid, "💾 Scores GitHub mein save ho gaye! ✅")
-    else:
-        await app.bot.send_message(cid, f"⚠️ Scores save nahi hue.\n❌ {err}")
-
-# ════════════════════════════════════════════════════
-# AUTO SCHEDULER  (9:00, 12:00, 15:00, 20:00 IST)
-# ════════════════════════════════════════════════════
-
-IST = timezone(timedelta(hours=5, minutes=30))
-
-async def _scheduler(app: Application):
-    """Background task — waits for next scheduled time then fires a mixed test."""
-    log.info("Scheduler started. Times: %s IST", SCHEDULE_TIMES)
-    while True:
-        now = datetime.now(IST)
-        # Find next slot
-        next_dt = None
-        for h, m in sorted(SCHEDULE_TIMES):
-            candidate = now.replace(hour=h, minute=m, second=0, microsecond=0)
-            if candidate > now:
-                next_dt = candidate
-                break
-        if next_dt is None:
-            # All slots passed today — use first slot tomorrow
-            h, m = sorted(SCHEDULE_TIMES)[0]
-            next_dt = (now + timedelta(days=1)).replace(
-                hour=h, minute=m, second=0, microsecond=0)
-
-        wait = (next_dt - datetime.now(IST)).total_seconds()
-        log.info("Next auto-test at %s IST (in %.0f s)", next_dt.strftime("%H:%M"), wait)
-        await asyncio.sleep(wait)
-
-        if not CHAT_ID:
-            log.warning("CHAT_ID not set — skipping scheduled test")
-            continue
-        try:
-            group_cid = int(CHAT_ID)
-            await app.bot.send_message(
-                group_cid,
-                f"🕐 Scheduled Test — {next_dt.strftime('%H:%M')} IST\n🚀 Shuru ho raha hai!",
-            )
-            # Use a simple namespace to carry app
-            class FakeCtx:
-                application = app
-            await begin(FakeCtx(), group_cid, "mixed")
-        except Exception as e:
-            log.error("Scheduler start error: %s", e)
-
-# ════════════════════════════════════════════════════
-# PARSE QUESTIONS
-# ════════════════════════════════════════════════════
-
-def parse_qs(text):
-    result = []; am = {"A":0,"B":1,"C":2,"D":3}
-    for block in text.strip().split("---"):
-        block = block.strip()
-        if not block: continue
-        d = {"subject":"General"}; opts = []
-        for line in block.splitlines():
-            line = line.strip()
-            if not line: continue
-            low = line.upper()
-            if   low.startswith("SUBJECT:"): d["subject"]     = line.split(":",1)[1].strip()
-            elif low.startswith("QH:"):      d["question_hi"] = line.split(":",1)[1].strip()
-            elif low.startswith("QE:"):      d["question_en"] = line.split(":",1)[1].strip()
-            elif low.startswith("Q:"):
-                v=line.split(":",1)[1].strip(); d["question_hi"]=v; d["question_en"]=v
-            elif re.match(r"^[ABCD]:", low): opts.append(line.split(":",1)[1].strip())
-            elif low.startswith("ANS:"):
-                d["answer_index"]=am.get(line.split(":",1)[1].strip().upper(),0)
-        has_q = "question_hi" in d or "question_en" in d
-        if has_q and len(opts)>=2 and "answer_index" in d:
-            d["options"]=opts; d["question"]=d.get("question_hi") or d.get("question_en","")
-            result.append(d)
-    return result
-
-# ════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════
 # COMMANDS
-# ════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════
 
 async def c_start(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    is_admin = u.effective_user.id == ADMIN_ID
-    kb = bottom_kb() if is_admin else user_bottom_kb()
     await u.message.reply_text(
-        "🎓 *Sarkari Naukri Academy Quiz Bot*\n\n"
+        "🎓 *Sarkari Naukri Academy Quiz Bot v7.0*\n\n"
         "• 100 Questions | ⏱ 10 Minutes\n"
-        "• ⏲ Har question: 6 seconds\n"
-        "• ✅ Sahi = +1 | ❌ Galat = counted\n"
-        "• 🏆 Top-20 Leaderboard\n\n"
-        "👇 Neeche buttons se choose karo:",
-        reply_markup=kb, parse_mode="Markdown")
+        "• Test: 6 sec/Q | Normal: 60 sec/Q\n"
+        "• ✅ Sahi = green tick | ❌ Galat = red cross\n"
+        "• 📖 Hindi + English bilingual\n"
+        "• 🏆 Auto rank result in group\n"
+        "• 🕐 Auto tests: 9AM, 12PM, 3PM, 8PM IST\n\n"
+        "👇 Choose karo:",
+        reply_markup=main_kb(), parse_mode="Markdown")
 
 async def c_status(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    qs = load_qs(); sc = load_sc()
-    sub = subjects(qs)
-    gh_ok, gh_msg = check_github_token()
+    qs = load_qs(); sc = load_sc(); cfg = load_cfg()
+    gh_ok, gh_msg = gh_token_ok()
+    subs = get_subjects(qs)
     si = "\n".join(
         f"  • {s}: {sum(1 for q in qs if q.get('subject','General')==s)}"
-        for s in sub) or "  None"
+        for s in subs) or "  None"
+    auto = "✅ ON" if cfg.get("auto_enabled", True) else "❌ OFF"
     await u.message.reply_text(
         f"📊 *Bot Status*\n━━━━━━━━━━━━━━━\n"
         f"❓`{len(qs)}` Questions | 👥`{len(sc)}` Users\n"
-        f"🔴 Active Tests:`{len(sess)}` | ⏲ Q-Timer:`{Q_TIME_SEC}s` | ⏱ Total:`{TEST_MIN}m`\n"
+        f"🔴 Active:`{len(sess)}` | ⏱ Timer:`{TIMER}s`\n"
+        f"🕐 Auto Tests: {auto}\n"
+        f"🕐 Next at: 9AM/12PM/3PM/8PM IST\n"
         f"💾 GitHub: {gh_msg}\n\n"
         f"*Subjects:*\n{si}\n━━━━━━━━━━━━━━━",
         parse_mode="Markdown")
 
 async def c_lb(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    await u.message.reply_text(lb_msg(load_sc()), parse_mode="Markdown")
+    await u.message.reply_text(lb_text(load_sc()), parse_mode="Markdown")
 
 async def c_stop(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    if u.effective_user.id != ADMIN_ID:
-        await u.message.reply_text("❌ Sirf admin."); return
-    cid = int(CHAT_ID) if CHAT_ID else u.effective_chat.id
+    cid = u.effective_chat.id
     if cid in sess:
         await end_test(ctx.application, cid, forced=True)
         await u.message.reply_text("⏹ Test rok diya.")
@@ -488,11 +302,16 @@ async def c_addq(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await u.message.reply_text("❌ Sirf admin."); return
     ctx.user_data["aq"] = True
     await u.message.reply_text(
-        "📋 *Text Paste Karo — Format:*\n\n"
+        "📋 *Text Paste Format:*\n\n"
         "```\nSUBJECT: History\n"
         "QH: हिंदी प्रश्न?\nQE: English question?\n"
-        "A: Option A\nB: Option B\nC: Option C\nD: Option D\nANS: B\n---\n```\n"
-        "Multiple questions ke beech `---` lagao.",
+        "A: विकल्प A / Option A\n"
+        "B: विकल्प B / Option B\n"
+        "C: विकल्प C / Option C\n"
+        "D: विकल्प D / Option D\n"
+        "ANS: B\n---\n```\n"
+        "Multiple questions: `---` se alag karo.\n"
+        "💾 Purane questions DELETE NAHI honge.",
         parse_mode="Markdown")
 
 async def c_myid(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -501,193 +320,199 @@ async def c_myid(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown")
 
 async def c_ghcheck(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    ok, msg = check_github_token()
-    icon = "✅" if ok else "❌"
+    ok, msg = gh_token_ok()
     await u.message.reply_text(
-        f"🔧 *GitHub Token Check*\n\n{icon} {msg}\n\n"
+        f"🔧 *GitHub Status*\n\n{msg}\n\n"
         + ("" if ok else
-           "🔑 *Fix karo:*\n"
-           "1. github.com/settings/tokens pe jao\n"
-           "2. New token banao (classic)\n"
-           "3. `repo` scope select karo ✅\n"
-           "4. Railway → Variables → GITHUB_TOKEN update karo"),
+           "🔑 *Fix:*\n1. github.com/settings/tokens\n"
+           "2. New token (classic) → `repo` scope ✅\n"
+           "3. Railway → GITHUB_TOKEN update karo"),
         parse_mode="Markdown")
 
-# ════════════════════════════════════════════════════
-# MESSAGE HANDLER  (bottom keyboard text buttons)
-# ════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════
+# CALLBACK HANDLER
+# ════════════════════════════════════════════════════════
+
+async def on_cb(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    q = u.callback_query
+    await q.answer()
+    d = q.data; cid = q.message.chat_id; user = q.from_user
+
+    if d == "lb":
+        await q.message.reply_text(lb_text(load_sc()), parse_mode="Markdown")
+
+    elif d == "me":
+        uid = str(user.id); sc = load_sc()
+        if uid in sc:
+            x = sc[uid]; c = x.get("total_correct",0); w = x.get("total_wrong",0)
+            acc = round(c/(c+w)*100,1) if c+w else 0
+            await q.message.reply_text(
+                f"📊 *Tumhara Score*\n━━━━━━━━━━━━━━\n"
+                f"👤 {x.get('name','?')}\n"
+                f"✅ Sahi:`{c}` ❌ Galat:`{w}`\n"
+                f"🎯 Accuracy:`{acc}%` 📝 Tests:`{x.get('tests_taken',0)}`\n"
+                f"⏱ Best:`{fmt_time(x.get('best_time',0))}` 🏆 Score:`{x.get('total_score',0)}`",
+                parse_mode="Markdown")
+        else:
+            await q.message.reply_text("Tumne abhi koi test nahi diya!")
+
+    elif d == "stat":
+        await c_status(
+            type("F", (), {"message": q.message, "effective_user": user})(),
+            ctx)
+
+    elif d == "gh_check":
+        ok, msg = gh_token_ok()
+        await q.message.reply_text(
+            f"🔧 *GitHub*\n{msg}\n\n"
+            + ("" if ok else
+               "Fix: github.com/settings/tokens → `repo` scope → Railway update"),
+            parse_mode="Markdown")
+
+    elif d == "toggle_auto":
+        if user.id != ADMIN_ID:
+            await q.message.reply_text("❌ Sirf admin."); return
+        cfg = load_cfg()
+        cfg["auto_enabled"] = not cfg.get("auto_enabled", True)
+        save_cfg(cfg)
+        state = "✅ ON" if cfg["auto_enabled"] else "❌ OFF"
+        await q.message.reply_text(f"🕐 Auto Tests: {state}")
+
+    elif d == "mode_mixed":
+        # Start test in GROUP
+        target = int(CHAT_ID) if CHAT_ID else cid
+        await begin_test(ctx, target, "mixed", q_time=TEST_Q_TIME)
+
+    elif d == "mode_subj":
+        qs = load_qs(); subs = get_subjects(qs)
+        if not subs:
+            await q.message.reply_text("❌ Koi questions nahi. Pehle add karo."); return
+        kb = [[InlineKeyboardButton(f"📌 {s}", callback_data=f"s_{s}")] for s in subs]
+        kb.append([InlineKeyboardButton("🔙 Back", callback_data="back")])
+        await q.message.reply_text("📚 *Subject choose karo:*",
+            reply_markup=InlineKeyboardMarkup(kb), parse_mode="Markdown")
+
+    elif d.startswith("s_"):
+        target = int(CHAT_ID) if CHAT_ID else cid
+        await begin_test(ctx, target, d[2:], q_time=TEST_Q_TIME)
+
+    elif d == "polls_start":
+        if user.id != ADMIN_ID:
+            await q.message.reply_text("❌ Sirf admin."); return
+        target = int(CHAT_ID) if CHAT_ID else cid
+        await begin_test(ctx, target, "mixed", q_time=TIMER)
+
+    elif d == "polls_stop":
+        if user.id != ADMIN_ID:
+            await q.message.reply_text("❌ Sirf admin."); return
+        target = int(CHAT_ID) if CHAT_ID else cid
+        if target in sess:
+            await end_test(ctx.application, target, forced=True)
+            await q.message.reply_text("⏹ Polls band.")
+        else:
+            await q.message.reply_text("Koi poll nahi chal raha.")
+
+    elif d == "text_help":
+        if user.id != ADMIN_ID:
+            await q.message.reply_text("❌ Sirf admin."); return
+        ctx.user_data["aq"] = True
+        await q.message.reply_text(
+            "📋 *Text Paste Format:*\n\n"
+            "```\nSUBJECT: Geography\n"
+            "QH: हिंदी प्रश्न?\nQE: English?\n"
+            "A: हिंदी / English\nB: हिंदी / English\n"
+            "C: हिंदी / English\nD: हिंदी / English\nANS: A\n---\n```\n"
+            "Ab text paste karo 👇",
+            parse_mode="Markdown")
+
+    elif d == "pdf_help":
+        if user.id != ADMIN_ID:
+            await q.message.reply_text("❌ Sirf admin."); return
+        ctx.user_data["pdf_mode"] = True
+        await q.message.reply_text(
+            "📄 *PDF Upload Karo*\n\nSeedha PDF bhejo — questions auto extract honge!\n\n"
+            "PDF format:\n```\n1. Question?\n(A) Option A\n(B) Option B\n(C) Option C\n(D) Option D\n```",
+            parse_mode="Markdown")
+
+    elif d == "ai_gen":
+        if user.id != ADMIN_ID:
+            await q.message.reply_text("❌ Sirf admin."); return
+        ctx.user_data["ai"] = True
+        await q.message.reply_text(
+            "🤖 Subject likho:\n_Example: History, Science, Geography, Polity, Math_",
+            parse_mode="Markdown")
+
+    elif d == "ask_del":
+        if user.id != ADMIN_ID:
+            await q.message.reply_text("❌ Sirf admin."); return
+        await q.message.reply_text(
+            "⚠️ *Saare questions delete karne hain?*",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("✅ Haan", callback_data="yes_del"),
+                 InlineKeyboardButton("❌ Nahi",  callback_data="no_del")]
+            ]), parse_mode="Markdown")
+
+    elif d == "yes_del":
+        if user.id != ADMIN_ID: return
+        ok, err = gh_write(Q_FILE, [], "Admin: delete all")
+        await q.message.reply_text("🗑 Done." if ok else f"❌ {err}")
+
+    elif d == "no_del":
+        await q.message.reply_text("✅ Cancel.")
+
+    elif d == "back":
+        await q.message.reply_text("👇", reply_markup=main_kb())
+
+# ════════════════════════════════════════════════════════
+# MESSAGE HANDLER
+# ════════════════════════════════════════════════════════
 
 async def on_msg(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user = u.effective_user
     text = (u.message.text or "").strip()
-    group_cid = int(CHAT_ID) if CHAT_ID else u.effective_chat.id
 
-    # ── AI subject ───────────────────────────────────
     if user.id == ADMIN_ID and ctx.user_data.get("ai"):
         ctx.user_data.pop("ai")
-        await u.message.reply_text(
-            f"🤖 AI se *{text}* questions bana raha hoon...", parse_mode="Markdown")
+        await u.message.reply_text(f"🤖 *{text}* ke questions bana raha hoon...", parse_mode="Markdown")
         new_qs = groq_gen(text, 10)
         if not new_qs:
-            await u.message.reply_text(
-                "❌ AI se questions nahi aaye.\nGROQ_KEY check karo ya manually add karo."); return
+            await u.message.reply_text("❌ AI se questions nahi aaye."); return
         all_qs = load_qs(); all_qs.extend(new_qs)
-        ok, err = gh_write(Q_FILE, all_qs, f"AI: {len(new_qs)} {text} questions")
+        ok, err = gh_write(Q_FILE, all_qs, f"AI: {len(new_qs)} {text}")
         if ok:
             await u.message.reply_text(f"✅ {len(new_qs)} AI questions add!\nTotal: {len(all_qs)} 💾✅")
         else:
             await u.message.reply_text(
-                f"⚠️ Questions ready, GitHub save fail!\n❌ {err}\n"
-                f"Questions is session mein memory mein hain.")
+                f"⚠️ {len(new_qs)} questions ready but save fail!\n❌ {err}\n\n"
+                f"🔑 Fix: github.com/settings/tokens → repo scope → Railway update")
         return
 
-    # ── Text paste questions ──────────────────────────
     if user.id == ADMIN_ID and ctx.user_data.get("aq"):
         ctx.user_data.pop("aq")
         parsed = parse_qs(text)
         if not parsed:
             await u.message.reply_text(
-                "❌ Koi question parse nahi hua.\n\nFormat:\n"
-                "```\nSUBJECT: History\nQH: हिंदी?\nQE: English?\n"
-                "A: ...\nB: ...\nC: ...\nD: ...\nANS: A\n---\n```",
-                parse_mode="Markdown"); return
+                "❌ Koi question parse nahi hua.\nFormat check karo.\n"
+                "SUBJECT/QH/QE/A/B/C/D/ANS sab hona chahiye."); return
         all_qs = load_qs(); all_qs.extend(parsed)
         ok, err = gh_write(Q_FILE, all_qs, f"Manual: {len(parsed)} questions")
         if ok:
             await u.message.reply_text(
-                f"✅ *{len(parsed)} questions add ho gaye!*\n"
-                f"📊 Total: {len(all_qs)} questions\n💾 GitHub safe ✅", parse_mode="Markdown")
-        else:
-            await u.message.reply_text(
-                f"⚠️ *{len(parsed)} parsed, GitHub save nahi hua!*\n❌ {err}\n"
-                f"Questions memory mein hain — test chal sakta hai!", parse_mode="Markdown")
-        return
-
-    # ── Bottom keyboard buttons ───────────────────────
-    if text in ("📝 Mixed Test (सभी विषय)", "▶️ Polls Start"):
-        if user.id != ADMIN_ID:
-            await u.message.reply_text("❌ Sirf admin test shuru kar sakta hai."); return
-        await begin(ctx, group_cid, "mixed")
-
-    elif text == "📚 Subject-wise Test":
-        if user.id != ADMIN_ID:
-            await u.message.reply_text("❌ Sirf admin."); return
-        qs = load_qs()
-        if not subjects(qs):
-            await u.message.reply_text("❌ Koi questions nahi."); return
-        await u.message.reply_text(
-            "📚 *Subject choose karo:*",
-            reply_markup=inline_subj_kb(qs), parse_mode="Markdown")
-
-    elif text == "⏹ Polls Stop":
-        if user.id != ADMIN_ID:
-            await u.message.reply_text("❌ Sirf admin."); return
-        if group_cid in sess:
-            await end_test(ctx.application, group_cid, forced=True)
-            await u.message.reply_text("⏹ Polls band kar diye.")
-        else:
-            await u.message.reply_text("Koi poll nahi chal raha.")
-
-    elif text == "📄 PDF Upload कर":
-        if user.id != ADMIN_ID:
-            await u.message.reply_text("❌ Sirf admin."); return
-        ctx.user_data["pdf_mode"] = True
-        await u.message.reply_text(
-            "📄 *PDF Upload Karo*\n\nSeedha yahan PDF bhejo.\nBot questions extract kar lega!",
-            parse_mode="Markdown")
-
-    elif text == "📋 Text Paste करो":
-        if user.id != ADMIN_ID:
-            await u.message.reply_text("❌ Sirf admin."); return
-        ctx.user_data["aq"] = True
-        await u.message.reply_text(
-            "📋 *Format:*\n```\nSUBJECT: History\n"
-            "QH: हिंदी?\nQE: English?\n"
-            "A: ...\nB: ...\nC: ...\nD: ...\nANS: B\n---\n```\n"
-            "Ab text paste karo 👇", parse_mode="Markdown")
-
-    elif text == "🤖 AI Questions बनाओ":
-        if user.id != ADMIN_ID:
-            await u.message.reply_text("❌ Sirf admin."); return
-        ctx.user_data["ai"] = True
-        await u.message.reply_text(
-            "🤖 Subject likho:\n_Example: History, Science, Geography_",
-            parse_mode="Markdown")
-
-    elif text in ("🏆 Leaderboard", "/leaderboard"):
-        await u.message.reply_text(lb_msg(load_sc()), parse_mode="Markdown")
-
-    elif text == "📊 My Score":
-        uid = str(user.id); sc = load_sc()
-        if uid in sc:
-            x=sc[uid]; c=x.get("total_correct",0); w=x.get("total_wrong",0)
-            acc = round(c/(c+w)*100,1) if c+w else 0
-            await u.message.reply_text(
-                f"📊 *Tumhara Score*\n━━━━━━━━━━━━━━\n"
-                f"👤 {x.get('name','?')}\n"
-                f"✅ Sahi:`{c}` ❌ Galat:`{w}`\n"
-                f"🎯 Accuracy:`{acc}%` 📝 Tests:`{x.get('tests_taken',0)}`\n"
-                f"⏱ Best:`{ft(x.get('best_time',0))}` 🏆 Score:`{x.get('total_score',0)}`",
+                f"✅ *{len(parsed)} questions add!*\nTotal: {len(all_qs)} 💾✅",
                 parse_mode="Markdown")
         else:
-            await u.message.reply_text("Tumne abhi koi test nahi diya!")
+            await u.message.reply_text(
+                f"⚠️ *{len(parsed)} questions parsed* lekin save fail!\n\n"
+                f"❌ Reason: {err}\n\n"
+                f"🔑 *Fix:*\n1. github.com/settings/tokens\n"
+                f"2. New token (classic) → `repo` ✅\n"
+                f"3. Railway → GITHUB_TOKEN update",
+                parse_mode="Markdown")
+        return
 
-    elif text == "📈 Status":
-        qs=load_qs(); sc=load_sc()
-        gh_ok, gh_msg = check_github_token()
-        si = "\n".join(
-            f"  • {s}: {sum(1 for q in qs if q.get('subject','General')==s)}"
-            for s in subjects(qs)) or "  None"
-        await u.message.reply_text(
-            f"📊 `{len(qs)}` Qs | 👥`{len(sc)}` Users | 🔴`{len(sess)}` Tests\n"
-            f"💾 GitHub: {'✅' if gh_ok else '❌'} {gh_msg}\n\n*Subjects:*\n{si}",
-            parse_mode="Markdown")
+    await u.message.reply_text("👇 Menu:", reply_markup=main_kb())
 
-    elif text == "🗑 Sab Delete":
-        if user.id != ADMIN_ID:
-            await u.message.reply_text("❌ Sirf admin."); return
-        await u.message.reply_text(
-            "⚠️ *Saare questions delete karne hain?*",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("✅ Haan Delete", callback_data="yes_del"),
-                 InlineKeyboardButton("❌ Cancel",       callback_data="no_del")]
-            ]), parse_mode="Markdown")
-
-    else:
-        # Default — show menu again
-        is_admin = user.id == ADMIN_ID
-        await u.message.reply_text(
-            "👇 Menu:",
-            reply_markup=bottom_kb() if is_admin else user_bottom_kb())
-
-# ── Inline Callback Handler ──────────────────────────
-async def on_cb(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    q = u.callback_query
-    await q.answer()
-    d = q.data; cid = q.message.chat_id; user = q.from_user
-    group_cid = int(CHAT_ID) if CHAT_ID else cid
-
-    if d.startswith("s_"):
-        if user.id != ADMIN_ID:
-            await q.message.reply_text("❌ Sirf admin."); return
-        await begin(ctx, group_cid, d[2:])
-
-    elif d == "yes_del":
-        if user.id != ADMIN_ID: return
-        ok, err = gh_write(Q_FILE, [], "Admin: delete all")
-        if ok: await q.message.reply_text("🗑 Saare questions delete ho gaye.")
-        else:  await q.message.reply_text(f"❌ Delete fail: {err}")
-
-    elif d == "no_del":
-        await q.message.reply_text("✅ Cancel. Kuch delete nahi hua.")
-
-    elif d == "back":
-        is_admin = user.id == ADMIN_ID
-        await q.message.reply_text(
-            "👇 Menu:",
-            reply_markup=bottom_kb() if is_admin else user_bottom_kb())
-
-# ── PDF handler ──────────────────────────────────────
+# ── PDF handler ──────────────────────────────────────────
 async def on_document(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user = u.effective_user
     if user.id != ADMIN_ID:
@@ -697,70 +522,67 @@ async def on_document(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
     fname = (doc.file_name or "").lower()
     if not (fname.endswith(".pdf") or fname.endswith(".txt")):
         await u.message.reply_text("⚠️ Sirf PDF ya TXT bhejo."); return
-
     await u.message.reply_text(f"📄 Processing *{doc.file_name}*...", parse_mode="Markdown")
     try:
         tg_file = await ctx.bot.get_file(doc.file_id)
-        file_bytes = bytes(await tg_file.download_as_bytearray())
-        text = file_bytes.decode("utf-8", errors="ignore") if fname.endswith(".txt") else _pdf_extract(file_bytes)
-        parsed = parse_qs(text) or _pdf_parse_mcq(text)
+        fb = bytes(await tg_file.download_as_bytearray())
+        text = fb.decode("utf-8", errors="ignore") if fname.endswith(".txt") else _pdf_text(fb)
+        parsed = parse_qs(text) or _parse_mcq(text)
         if not parsed:
-            await u.message.reply_text(
-                "❌ Questions extract nahi ho sake.\n📋 Text Paste button use karo."); return
+            await u.message.reply_text("❌ Questions extract nahi ho sake.\n📋 Text Paste use karo."); return
         all_qs = load_qs(); all_qs.extend(parsed)
         ok, err = gh_write(Q_FILE, all_qs, f"PDF: {len(parsed)} from {doc.file_name}")
         if ok:
-            await u.message.reply_text(
-                f"✅ *{len(parsed)} questions add!*\nTotal: {len(all_qs)} 💾✅", parse_mode="Markdown")
+            await u.message.reply_text(f"✅ *{len(parsed)} questions add!*\nTotal: {len(all_qs)} 💾✅", parse_mode="Markdown")
         else:
-            await u.message.reply_text(f"⚠️ {len(parsed)} questions parse hue, GitHub save fail.\n❌ {err}")
+            await u.message.reply_text(f"⚠️ {len(parsed)} parsed, save fail.\n❌ {err}")
     except Exception as e:
         log.error("PDF: %s", e)
         await u.message.reply_text(f"❌ Error: {str(e)[:150]}")
 
-def _pdf_extract(b: bytes) -> str:
+def _pdf_text(b: bytes) -> str:
     try:
-        text = b.decode("latin-1", errors="ignore")
-        chunks = re.findall(r'\((.*?)\)', text)
-        result = " ".join(chunks)
-        result = re.sub(r'\\[nrt]', ' ', result)
-        return re.sub(r'\s+', ' ', result)[:50000]
+        t = b.decode("latin-1", errors="ignore")
+        chunks = re.findall(r'\((.*?)\)', t)
+        r = re.sub(r'\s+', ' ', re.sub(r'\\[nrt]', ' ', " ".join(chunks)))
+        return r[:50000]
     except Exception:
         return ""
 
-def _pdf_parse_mcq(text: str) -> list:
-    questions = []
+def _parse_mcq(text: str) -> list:
+    result = []
     blocks = re.split(r'(?:^|\s)(?:Q\.?\s*)?(\d+)[.)]\s+', text, flags=re.MULTILINE)
     for block in blocks:
         block = block.strip()
         if len(block) < 20: continue
         lines = [l.strip() for l in block.split('\n') if l.strip()]
         if not lines: continue
-        q_text = lines[0]; opts = []; ans_idx = 0
+        qt = lines[0]; opts = []; ans = 0
         for line in lines[1:]:
             m = re.match(r'^[\(\[]?([A-Da-d])[\)\]\.]\s*(.+)', line)
             if m: opts.append(m.group(2).strip()[:100])
             a = re.search(r'(?:ans(?:wer)?|correct)[:\s]*([A-Da-d])', line, re.I)
-            if a: ans_idx = ord(a.group(1).upper()) - ord('A')
-        if q_text and len(opts) >= 2:
-            questions.append({
-                "question": q_text[:300], "question_hi": q_text[:300],
-                "question_en": q_text[:300], "options": opts[:4],
-                "answer_index": max(0, min(ans_idx, len(opts)-1)),
+            if a: ans = ord(a.group(1).upper()) - ord('A')
+        if qt and len(opts) >= 2:
+            result.append({
+                "question": qt[:300], "question_hi": qt[:300], "question_en": qt[:300],
+                "options": opts[:4], "answer_index": max(0, min(ans, len(opts)-1)),
                 "subject": "General",
             })
-    return questions[:200]
+    return result[:200]
 
-# ════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════
 # GROQ AI
-# ════════════════════════════════════════════════════
-def groq_gen(subject, count=10):
+# ════════════════════════════════════════════════════════
+
+def groq_gen(subject: str, count: int = 10) -> list:
     if not GROQ_KEY: return []
     prompt = (
-        f'Generate {count} MCQ for "{subject}" Indian Govt exams.\n'
-        'Return ONLY JSON array:\n'
+        f'Generate {count} MCQ for "{subject}" for SSC/Railway/UPSC exams.\n'
+        'Return ONLY valid JSON array, no extra text:\n'
         '[{"question_hi":"हिंदी?","question_en":"English?",'
-        '"options":["A","B","C","D"],'
+        '"options":["हिंदी A / English A","हिंदी B / English B",'
+        '"हिंदी C / English C","हिंदी D / English D"],'
         f'"answer_index":0,"subject":"{subject}"}}]'
     )
     try:
@@ -779,24 +601,334 @@ def groq_gen(subject, count=10):
         log.error("groq: %s", e)
     return []
 
-# ════════════════════════════════════════════════════
-# POST INIT
-# ════════════════════════════════════════════════════
-async def post_init(app: Application):
-    ok, msg = check_github_token()
-    log.info("GitHub token: %s — %s", "OK" if ok else "FAIL", msg)
-    # Start scheduler as background task
-    asyncio.create_task(_scheduler(app))
-    log.info("Auto-scheduler started for times: %s IST", SCHEDULE_TIMES)
+# ════════════════════════════════════════════════════════
+# TEST FLOW — sends to CHAT_ID (GROUP)
+# ════════════════════════════════════════════════════════
 
-# ════════════════════════════════════════════════════
+async def begin_test(ctx, chat_id: int, mode: str, q_time: int = TEST_Q_TIME):
+    """Start a test in the given chat_id (always the group)."""
+    if chat_id in sess:
+        log.warning("Test already running in %s", chat_id)
+        return False
+
+    all_qs = load_qs()
+    selected = pick_qs(all_qs, mode, TOTAL_Q)
+    if not selected:
+        try:
+            await ctx.bot.send_message(
+                chat_id,
+                "❌ Questions nahi hain. Admin se contact karo.")
+        except Exception:
+            pass
+        return False
+
+    sess[chat_id] = {
+        "questions":  selected,
+        "poll_map":   {},        # poll_id -> q_index
+        "user_data":  {},        # uid -> stats
+        "start_time": time.time(),
+        "mode":       mode,
+        "q_time":     q_time,
+        "timer_task": None,
+        "result_msgs": [],
+    }
+
+    label = "🔀 Mixed (सभी विषय)" if mode == "mixed" else f"📌 {mode}"
+    try:
+        await ctx.bot.send_message(
+            chat_id,
+            f"🚀 *TEST SHURU!*\n━━━━━━━━━━━━━━━━━\n"
+            f"📋 {label}\n"
+            f"❓ {len(selected)} Questions\n"
+            f"⏱ {q_time} sec per question\n"
+            f"⏰ Total: 10 minutes\n"
+            f"━━━━━━━━━━━━━━━━━\n"
+            f"✅ Sahi = green ✅ | ❌ Galat = red ❌\n"
+            f"Band karne ke liye: /stoptest\n\n"
+            f"*All the best! 🎯*",
+            parse_mode="Markdown")
+    except Exception as e:
+        log.error("begin_test announce: %s", e)
+
+    # Auto-end after TEST_DURATION
+    task = asyncio.create_task(_auto_end(ctx.application, chat_id))
+    sess[chat_id]["timer_task"] = task
+
+    # Send polls
+    asyncio.create_task(_send_polls(ctx.application, chat_id))
+    return True
+
+async def _auto_end(app, cid: int):
+    await asyncio.sleep(TEST_DURATION)
+    if cid in sess:
+        try:
+            await app.bot.send_message(
+                cid, f"⏰ *10 minutes khatam!* Result aa raha hai...",
+                parse_mode="Markdown")
+        except Exception:
+            pass
+        await end_test(app, cid, forced=True)
+
+async def _send_polls(app, cid: int):
+    if cid not in sess: return
+    s = sess[cid]
+    total = len(s["questions"])
+    q_time = s.get("q_time", TEST_Q_TIME)
+
+    for i, q in enumerate(s["questions"]):
+        if cid not in sess: return
+
+        text = q_text(q, i, total)
+        opts = q_opts(q)
+        ans  = max(0, min(int(q.get("answer_index", 0)), len(opts)-1))
+
+        try:
+            msg = await app.bot.send_poll(
+                chat_id          = cid,
+                question         = text,
+                options          = opts,
+                type             = Poll.QUIZ,
+                correct_option_id= ans,       # ✅ sahi = green, galat = red
+                is_anonymous     = False,
+                open_period      = min(max(q_time, 5), 600),
+            )
+            if cid in sess:
+                sess[cid]["poll_map"][str(msg.poll.id)] = i
+        except Exception as e:
+            log.error("Poll Q%d: %s", i+1, e)
+
+        await asyncio.sleep(q_time)
+
+    if cid in sess:
+        try:
+            await app.bot.send_message(cid, "✅ Saare questions ho gaye! Result aa raha hai...")
+        except Exception:
+            pass
+        await asyncio.sleep(5)
+        await end_test(app, cid)
+
+# ── Poll answer ──────────────────────────────────────────
+async def on_poll_ans(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    pa   = u.poll_answer
+    pid  = str(pa.poll_id)
+    user = pa.user
+    uid  = str(user.id)
+
+    for cid, s in list(sess.items()):
+        if pid not in s["poll_map"]: continue
+        qi      = s["poll_map"][pid]
+        correct = int(s["questions"][qi].get("answer_index", 0))
+
+        if uid not in s["user_data"]:
+            s["user_data"][uid] = {
+                "name":       user.full_name,
+                "correct":    0,
+                "wrong":      0,
+                "start_time": s["start_time"],
+                "last_time":  time.time(),
+            }
+        ud = s["user_data"][uid]
+        ud["name"]      = user.full_name
+        ud["last_time"] = time.time()
+
+        if pa.option_ids and pa.option_ids[0] == correct:
+            ud["correct"] += 1
+        else:
+            ud["wrong"] += 1
+        break
+
+# ── End test ─────────────────────────────────────────────
+async def end_test(app, cid: int, forced: bool = False):
+    if cid not in sess: return
+    s = sess.pop(cid)
+
+    if not forced and s.get("timer_task"):
+        s["timer_task"].cancel()
+
+    ud = s["user_data"]
+    if not ud:
+        try:
+            await app.bot.send_message(cid, "📊 Kisi ne participate nahi kiya.")
+        except Exception:
+            pass
+        return
+
+    # Build result
+    ranked = sorted(ud.items(),
+        key=lambda x: (-x[1]["correct"], x[1]["last_time"]-x[1]["start_time"]))
+
+    medals = {0:"🥇", 1:"🥈", 2:"🥉"}
+    lines  = [
+        f"🏁 *TEST RESULT — {now_ist().strftime('%d %b %Y, %I:%M %p IST')}* 🏁",
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+    ]
+    for i, (uid, d) in enumerate(ranked[:20]):
+        el  = d["last_time"] - d["start_time"]
+        tot = d["correct"] + d["wrong"]
+        acc = round(d["correct"]/tot*100, 1) if tot else 0
+        medal = medals.get(i, f"`{i+1}.`")
+        lines.append(
+            f"{medal} *{d['name']}*\n"
+            f"   ✅ Sahi:`{d['correct']}` ❌ Galat:`{d['wrong']}`\n"
+            f"   ⏱ Time:`{fmt_time(el)}` | 🎯 Accuracy:`{acc}%`")
+
+    lines += ["\n━━━━━━━━━━━━━━━━━━━━━━",
+              "🗑 _Ye result 2 ghante baad delete ho jayega_",
+              "🏆 /leaderboard"]
+
+    result_text = "\n".join(lines)
+
+    # Send to group
+    sent_ids = []
+    try:
+        msg = await app.bot.send_message(cid, result_text, parse_mode="Markdown")
+        sent_ids.append(msg.message_id)
+    except Exception as e:
+        log.error("end_test send result: %s", e)
+
+    # Schedule auto-delete after 2 hours
+    if sent_ids:
+        asyncio.create_task(_auto_delete(app, cid, sent_ids, delay=7200))
+
+    # Save scores
+    scores = load_sc()
+    for uid, d in ud.items():
+        el  = d["last_time"] - d["start_time"]
+        tot = d["correct"] + d["wrong"]
+        if uid not in scores:
+            scores[uid] = {
+                "name":"","total_score":0,"total_correct":0,
+                "total_wrong":0,"tests_taken":0,"best_time":99999,"accuracy":0.0,
+            }
+        sv = scores[uid]
+        sv["name"]          = d["name"]
+        sv["total_score"]   += d["correct"]
+        sv["total_correct"] += d["correct"]
+        sv["total_wrong"]   += d["wrong"]
+        sv["tests_taken"]   += 1
+        if el < sv["best_time"]: sv["best_time"] = round(el, 1)
+        tot2 = sv["total_correct"] + sv["total_wrong"]
+        sv["accuracy"] = round(sv["total_correct"]/tot2*100, 1) if tot2 else 0
+
+    ok, err = gh_write(S_FILE, scores, "Scores updated")
+    if ok:
+        gist_bak(scores)
+        try:
+            await app.bot.send_message(cid, "💾 Scores GitHub mein save ho gaye! ✅")
+        except Exception:
+            pass
+    else:
+        try:
+            await app.bot.send_message(cid, f"⚠️ Scores save fail: {err}")
+        except Exception:
+            pass
+
+async def _auto_delete(app, cid: int, msg_ids: list, delay: int):
+    """Delete result messages after `delay` seconds."""
+    await asyncio.sleep(delay)
+    for mid in msg_ids:
+        try:
+            await app.bot.delete_message(cid, mid)
+        except Exception:
+            pass
+    log.info("Auto-deleted result messages in %s", cid)
+
+# ════════════════════════════════════════════════════════
+# AUTO SCHEDULED TESTS
+# ════════════════════════════════════════════════════════
+
+async def auto_scheduler(app):
+    """
+    Runs forever. At each scheduled IST hour, starts a test in CHAT_ID.
+    """
+    log.info("Auto scheduler started. Test times IST: %s", AUTO_TEST_HOURS_IST)
+    fired_hours = set()
+
+    while True:
+        try:
+            now = now_ist()
+            hour_min = (now.hour, now.minute)
+
+            for h in AUTO_TEST_HOURS_IST:
+                key = (now.date(), h)
+                if now.hour == h and now.minute == 0 and key not in fired_hours:
+                    cfg = load_cfg()
+                    if cfg.get("auto_enabled", True) and CHAT_ID:
+                        log.info("Auto test firing at %s IST", h)
+                        fired_hours.add(key)
+                        target = int(CHAT_ID)
+                        if target not in sess:
+                            asyncio.create_task(
+                                begin_test(
+                                    type("C",(),{"bot":app.bot,"application":app})(),
+                                    target, "mixed", q_time=TEST_Q_TIME
+                                )
+                            )
+                        else:
+                            log.info("Test already running, skip auto at %s", h)
+
+            # Keep fired_hours clean (only today)
+            today = now.date()
+            fired_hours = {k for k in fired_hours if k[0] == today}
+
+        except Exception as e:
+            log.error("scheduler: %s", e)
+
+        await asyncio.sleep(30)   # check every 30 seconds
+
+# ════════════════════════════════════════════════════════
+# PARSE QUESTIONS TEXT
+# ════════════════════════════════════════════════════════
+
+def parse_qs(text: str) -> list:
+    result = []; am = {"A":0,"B":1,"C":2,"D":3}
+    for block in text.strip().split("---"):
+        block = block.strip()
+        if not block: continue
+        d = {"subject":"General"}; opts = []
+        for line in block.splitlines():
+            line = line.strip()
+            if not line: continue
+            low = line.upper()
+            if   low.startswith("SUBJECT:"): d["subject"]     = line.split(":",1)[1].strip()
+            elif low.startswith("QH:"):      d["question_hi"] = line.split(":",1)[1].strip()
+            elif low.startswith("QE:"):      d["question_en"] = line.split(":",1)[1].strip()
+            elif low.startswith("Q:"):
+                v = line.split(":",1)[1].strip()
+                d["question_hi"] = v; d["question_en"] = v
+            elif re.match(r"^[ABCD]:", low):
+                opts.append(line.split(":",1)[1].strip())
+            elif low.startswith("ANS:"):
+                d["answer_index"] = am.get(line.split(":",1)[1].strip().upper(), 0)
+        has_q = "question_hi" in d or "question_en" in d
+        if has_q and len(opts) >= 2 and "answer_index" in d:
+            d["options"]  = opts
+            d["question"] = d.get("question_hi") or d.get("question_en","")
+            result.append(d)
+    return result
+
+# ════════════════════════════════════════════════════════
+# POST INIT
+# ════════════════════════════════════════════════════════
+
+async def post_init(app: Application):
+    ok, msg = gh_token_ok()
+    log.info("GitHub: %s", msg)
+    # Start auto scheduler
+    asyncio.create_task(auto_scheduler(app))
+
+# ════════════════════════════════════════════════════════
 # MAIN
-# ════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════
+
 def main():
     if not BOT_TOKEN:
         log.error("BOT_TOKEN not set!"); return
-    log.info("Starting Bot v7.0...")
+
+    log.info("Starting Sarkari Naukri Academy Bot v7.0 (PTB 20.3)...")
+
     app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
+
     app.add_handler(CommandHandler("start",       c_start))
     app.add_handler(CommandHandler("test",        c_start))
     app.add_handler(CommandHandler("status",      c_status))
@@ -805,10 +937,12 @@ def main():
     app.add_handler(CommandHandler("addq",        c_addq))
     app.add_handler(CommandHandler("myid",        c_myid))
     app.add_handler(CommandHandler("ghcheck",     c_ghcheck))
+
     app.add_handler(CallbackQueryHandler(on_cb))
     app.add_handler(PollAnswerHandler(on_poll_ans))
     app.add_handler(MessageHandler(filters.Document.ALL, on_document))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_msg))
+
     log.info("Bot running!")
     app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
