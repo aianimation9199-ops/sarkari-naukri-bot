@@ -298,5 +298,135 @@
       "Bhutan"
     ],
     "question": "Where is the Khyber Pass located?"
+  },
+  {
+    "subject": "Geography",
+    "question_hi": "भारत के किस राज्य में 'नंदा देवी' पर्वत शिखर स्थित है?",
+    "question_en": "In which state of India is the 'Nanda Devi' peak located?",
+    "answer_index": 2,
+    "options": [
+      "Himachal Pradesh",
+      "Sikkim",
+      "Uttarakhand",
+      "Jammu & Kashmir"
+    ],
+    "question": "भारत के किस राज्य में 'नंदा देवी' पर्वत शिखर स्थित है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "बांदीपुर राष्ट्रीय उद्यान कहाँ स्थित है?",
+    "question_en": "Where is Bandipur National Park located?",
+    "answer_index": 0,
+    "options": [
+      "Karnataka",
+      "Kerala",
+      "Gujarat",
+      "Tamil Nadu"
+    ],
+    "question": "बांदीपुर राष्ट्रीय उद्यान कहाँ स्थित है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'येलो स्टोन' नेशनल पार्क के तर्ज पर भारत का प्रथम नेशनल पार्क कौन सा है?",
+    "question_en": "Which is the first National Park of India, based on the lines of 'Yellow Stone'?",
+    "answer_index": 1,
+    "options": [
+      "Kanha National Park",
+      "Jim Corbett National Park",
+      "Gir National Park",
+      "Kaziranga National Park"
+    ],
+    "question": "'येलो स्टोन' नेशनल पार्क के तर्ज पर भारत का प्रथम नेशनल पार्क कौन सा है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "भारत में खारे पानी की सबसे बड़ी झील कौन सी है?",
+    "question_en": "Which is the largest saltwater lake in India?",
+    "answer_index": 2,
+    "options": [
+      "Wular Lake",
+      "Sambhar Lake",
+      "Chilika Lake",
+      "Dal Lake"
+    ],
+    "question": "भारत में खारे पानी की सबसे बड़ी झील कौन सी है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'हीराकुड' परियोजना किस नदी के जल प्रवाह को नियंत्रित करती है?",
+    "question_en": "'Hirakud' project controls the water flow of which river?",
+    "answer_index": 1,
+    "options": [
+      "Krishna",
+      "Mahanadi",
+      "Tapi",
+      "Narmada"
+    ],
+    "question": "'हीराकुड' परियोजना किस नदी के जल प्रवाह को नियंत्रित करती है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "नागार्जुन सागर परियोजना किस नदी पर स्थित है?",
+    "question_en": "On which river is the Nagarjuna Sagar project located?",
+    "answer_index": 0,
+    "options": [
+      "Krishna",
+      "Kaveri",
+      "Godavari",
+      "Mahanadi"
+    ],
+    "question": "नागार्जुन सागर परियोजना किस नदी पर स्थित है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "भारत का सबसे ऊँचा दर्रा कौन सा है?",
+    "question_en": "Which is the highest pass in India?",
+    "answer_index": 1,
+    "options": [
+      "Zoji La Pass",
+      "Karakoram Pass",
+      "Rohtang Pass",
+      "Nathu La Pass"
+    ],
+    "question": "भारत का सबसे ऊँचा दर्रा कौन सा है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "कपास की खेती के लिए सबसे उपयुक्त मिट्टी कौन सी है?",
+    "question_en": "Which soil is most suitable for cotton cultivation?",
+    "answer_index": 2,
+    "options": [
+      "Red Soil",
+      "Alluvial Soil",
+      "Black Soil (Regur)",
+      "Laterite Soil"
+    ],
+    "question": "कपास की खेती के लिए सबसे उपयुक्त मिट्टी कौन सी है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "भारत में सबसे कम वर्षा वाला स्थान कौन सा है?",
+    "question_en": "Which is the place with the minimum rainfall in India?",
+    "answer_index": 0,
+    "options": [
+      "Leh",
+      "Jaisalmer",
+      "Bikaner",
+      "Cherrapunji"
+    ],
+    "question": "भारत में सबसे कम वर्षा वाला स्थान कौन सा है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "भारत की सबसे बड़ी मीठे पानी की झील कौन सी है?",
+    "question_en": "Which is the largest freshwater lake in India?",
+    "answer_index": 0,
+    "options": [
+      "Wular Lake",
+      "Chilika Lake",
+      "Loktak Lake",
+      "Pulicat Lake"
+    ],
+    "question": "भारत की सबसे बड़ी मीठे पानी की झील कौन सी है?"
   }
 ]
