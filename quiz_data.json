@@ -688,5 +688,135 @@
       "अनिश्चित"
     ],
     "question": "P(E) + P(\\bar{E}) (किसी घटना के होने और न होने की प्रायिकता का योग) कितना होता है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "एक अर्धवृत्त (Semi-circle) का कुल परिमाप क्या होता है?",
+    "question_en": "What is the total perimeter of a semi-circle?",
+    "answer_index": 1,
+    "options": [
+      "\\pi r",
+      "\\pi r + 2r",
+      "2\\pi r",
+      "\\pi r^2"
+    ],
+    "question": "एक अर्धवृत्त (Semi-circle) का कुल परिमाप क्या होता है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "मूल बिंदु (Origin) के निर्देशांक क्या होते हैं?",
+    "question_en": "What are the coordinates of the origin?",
+    "answer_index": 1,
+    "options": [
+      "(1, 1)",
+      "(0, 0)",
+      "(0, 1)",
+      "(1, 0)"
+    ],
+    "question": "मूल बिंदु (Origin) के निर्देशांक क्या होते हैं?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "(a + b)^2 का विस्तारित रूप क्या है?",
+    "question_en": "What is the expanded form of (a + b)^2?",
+    "answer_index": 1,
+    "options": [
+      "a^2 + b^2",
+      "a^2 + 2ab + b^2",
+      "a^2 - 2ab + b^2",
+      "a^2 + b^2 + ab"
+    ],
+    "question": "(a + b)^2 का विस्तारित रूप क्या है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "किसी संख्या और उसके व्युत्क्रम (Reciprocal) का गुणनफल क्या होता है?",
+    "question_en": "What is the product of a number and its reciprocal?",
+    "answer_index": 1,
+    "options": [
+      "0",
+      "1",
+      "-1",
+      "वह संख्या स्वयं"
+    ],
+    "question": "किसी संख्या और उसके व्युत्क्रम (Reciprocal) का गुणनफल क्या होता है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "यदि x + y = 10 और x - y = 2 है, तो x का मान क्या होगा?",
+    "question_en": "If x + y = 10 and x - y = 2, what is the value of x?",
+    "answer_index": 1,
+    "options": [
+      "4",
+      "6",
+      "8",
+      "5"
+    ],
+    "question": "यदि x + y = 10 और x - y = 2 है, तो x का मान क्या होगा?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "\\sqrt{1 + tan^2\\theta} किसके बराबर है?",
+    "question_en": "What is \\sqrt{1 + tan^2\\theta} equal to?",
+    "answer_index": 1,
+    "options": [
+      "sin\\theta",
+      "sec\\theta",
+      "cos\\theta",
+      "cot\\theta"
+    ],
+    "question": "\\sqrt{1 + tan^2\\theta} किसके बराबर है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "सबसे छोटी पूर्ण संख्या (Whole Number) कौन सी है?",
+    "question_en": "Which is the smallest whole number?",
+    "answer_index": 1,
+    "options": [
+      "1",
+      "0",
+      "-1",
+      "2"
+    ],
+    "question": "सबसे छोटी पूर्ण संख्या (Whole Number) कौन सी है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "एक पासा (Dice) फेंकने पर सम संख्या आने की प्रायिकता क्या है?",
+    "question_en": "What is the probability of getting an even number on throwing a die?",
+    "answer_index": 1,
+    "options": [
+      "1/3",
+      "1/2",
+      "1/6",
+      "2/3"
+    ],
+    "question": "एक पासा (Dice) फेंकने पर सम संख्या आने की प्रायिकता क्या है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "\\int \\frac{1}{x} dx का मान क्या होता है?",
+    "question_en": "What is the value of \\int \\frac{1}{x} dx?",
+    "answer_index": 1,
+    "options": [
+      "e^x",
+      "log|x|",
+      "x^2",
+      "-1/x^2"
+    ],
+    "question": "\\int \\frac{1}{x} dx का मान क्या होता है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "एक शताब्दी (Century) में कितने वर्ष होते हैं?",
+    "question_en": "How many years are there in a century?",
+    "answer_index": 1,
+    "options": [
+      "10",
+      "100",
+      "50",
+      "1000"
+    ],
+    "question": "एक शताब्दी (Century) में कितने वर्ष होते हैं?"
   }
 ]
