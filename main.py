@@ -516,3 +516,301 @@ async def c_ghcheck(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
 # ════════════════════════════════════════════════════
 # MESSAGE HANDLER  (bottom keyboard text buttons)
 # ════════════════════════════════════════════════════
+
+async def on_msg(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    user = u.effective_user
+    text = (u.message.text or "").strip()
+    group_cid = int(CHAT_ID) if CHAT_ID else u.effective_chat.id
+
+    # ── AI subject ───────────────────────────────────
+    if user.id == ADMIN_ID and ctx.user_data.get("ai"):
+        ctx.user_data.pop("ai")
+        await u.message.reply_text(
+            f"🤖 AI se *{text}* questions bana raha hoon...", parse_mode="Markdown")
+        new_qs = groq_gen(text, 10)
+        if not new_qs:
+            await u.message.reply_text(
+                "❌ AI se questions nahi aaye.\nGROQ_KEY check karo ya manually add karo."); return
+        all_qs = load_qs(); all_qs.extend(new_qs)
+        ok, err = gh_write(Q_FILE, all_qs, f"AI: {len(new_qs)} {text} questions")
+        if ok:
+            await u.message.reply_text(f"✅ {len(new_qs)} AI questions add!\nTotal: {len(all_qs)} 💾✅")
+        else:
+            await u.message.reply_text(
+                f"⚠️ Questions ready, GitHub save fail!\n❌ {err}\n"
+                f"Questions is session mein memory mein hain.")
+        return
+
+    # ── Text paste questions ──────────────────────────
+    if user.id == ADMIN_ID and ctx.user_data.get("aq"):
+        ctx.user_data.pop("aq")
+        parsed = parse_qs(text)
+        if not parsed:
+            await u.message.reply_text(
+                "❌ Koi question parse nahi hua.\n\nFormat:\n"
+                "```\nSUBJECT: History\nQH: हिंदी?\nQE: English?\n"
+                "A: ...\nB: ...\nC: ...\nD: ...\nANS: A\n---\n```",
+                parse_mode="Markdown"); return
+        all_qs = load_qs(); all_qs.extend(parsed)
+        ok, err = gh_write(Q_FILE, all_qs, f"Manual: {len(parsed)} questions")
+        if ok:
+            await u.message.reply_text(
+                f"✅ *{len(parsed)} questions add ho gaye!*\n"
+                f"📊 Total: {len(all_qs)} questions\n💾 GitHub safe ✅", parse_mode="Markdown")
+        else:
+            await u.message.reply_text(
+                f"⚠️ *{len(parsed)} parsed, GitHub save nahi hua!*\n❌ {err}\n"
+                f"Questions memory mein hain — test chal sakta hai!", parse_mode="Markdown")
+        return
+
+    # ── Bottom keyboard buttons ───────────────────────
+    if text in ("📝 Mixed Test (सभी विषय)", "▶️ Polls Start"):
+        if user.id != ADMIN_ID:
+            await u.message.reply_text("❌ Sirf admin test shuru kar sakta hai."); return
+        await begin(ctx, group_cid, "mixed")
+
+    elif text == "📚 Subject-wise Test":
+        if user.id != ADMIN_ID:
+            await u.message.reply_text("❌ Sirf admin."); return
+        qs = load_qs()
+        if not subjects(qs):
+            await u.message.reply_text("❌ Koi questions nahi."); return
+        await u.message.reply_text(
+            "📚 *Subject choose karo:*",
+            reply_markup=inline_subj_kb(qs), parse_mode="Markdown")
+
+    elif text == "⏹ Polls Stop":
+        if user.id != ADMIN_ID:
+            await u.message.reply_text("❌ Sirf admin."); return
+        if group_cid in sess:
+            await end_test(ctx.application, group_cid, forced=True)
+            await u.message.reply_text("⏹ Polls band kar diye.")
+        else:
+            await u.message.reply_text("Koi poll nahi chal raha.")
+
+    elif text == "📄 PDF Upload कर":
+        if user.id != ADMIN_ID:
+            await u.message.reply_text("❌ Sirf admin."); return
+        ctx.user_data["pdf_mode"] = True
+        await u.message.reply_text(
+            "📄 *PDF Upload Karo*\n\nSeedha yahan PDF bhejo.\nBot questions extract kar lega!",
+            parse_mode="Markdown")
+
+    elif text == "📋 Text Paste करो":
+        if user.id != ADMIN_ID:
+            await u.message.reply_text("❌ Sirf admin."); return
+        ctx.user_data["aq"] = True
+        await u.message.reply_text(
+            "📋 *Format:*\n```\nSUBJECT: History\n"
+            "QH: हिंदी?\nQE: English?\n"
+            "A: ...\nB: ...\nC: ...\nD: ...\nANS: B\n---\n```\n"
+            "Ab text paste karo 👇", parse_mode="Markdown")
+
+    elif text == "🤖 AI Questions बनाओ":
+        if user.id != ADMIN_ID:
+            await u.message.reply_text("❌ Sirf admin."); return
+        ctx.user_data["ai"] = True
+        await u.message.reply_text(
+            "🤖 Subject likho:\n_Example: History, Science, Geography_",
+            parse_mode="Markdown")
+
+    elif text in ("🏆 Leaderboard", "/leaderboard"):
+        await u.message.reply_text(lb_msg(load_sc()), parse_mode="Markdown")
+
+    elif text == "📊 My Score":
+        uid = str(user.id); sc = load_sc()
+        if uid in sc:
+            x=sc[uid]; c=x.get("total_correct",0); w=x.get("total_wrong",0)
+            acc = round(c/(c+w)*100,1) if c+w else 0
+            await u.message.reply_text(
+                f"📊 *Tumhara Score*\n━━━━━━━━━━━━━━\n"
+                f"👤 {x.get('name','?')}\n"
+                f"✅ Sahi:`{c}` ❌ Galat:`{w}`\n"
+                f"🎯 Accuracy:`{acc}%` 📝 Tests:`{x.get('tests_taken',0)}`\n"
+                f"⏱ Best:`{ft(x.get('best_time',0))}` 🏆 Score:`{x.get('total_score',0)}`",
+                parse_mode="Markdown")
+        else:
+            await u.message.reply_text("Tumne abhi koi test nahi diya!")
+
+    elif text == "📈 Status":
+        qs=load_qs(); sc=load_sc()
+        gh_ok, gh_msg = check_github_token()
+        si = "\n".join(
+            f"  • {s}: {sum(1 for q in qs if q.get('subject','General')==s)}"
+            for s in subjects(qs)) or "  None"
+        await u.message.reply_text(
+            f"📊 `{len(qs)}` Qs | 👥`{len(sc)}` Users | 🔴`{len(sess)}` Tests\n"
+            f"💾 GitHub: {'✅' if gh_ok else '❌'} {gh_msg}\n\n*Subjects:*\n{si}",
+            parse_mode="Markdown")
+
+    elif text == "🗑 Sab Delete":
+        if user.id != ADMIN_ID:
+            await u.message.reply_text("❌ Sirf admin."); return
+        await u.message.reply_text(
+            "⚠️ *Saare questions delete karne hain?*",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("✅ Haan Delete", callback_data="yes_del"),
+                 InlineKeyboardButton("❌ Cancel",       callback_data="no_del")]
+            ]), parse_mode="Markdown")
+
+    else:
+        # Default — show menu again
+        is_admin = user.id == ADMIN_ID
+        await u.message.reply_text(
+            "👇 Menu:",
+            reply_markup=bottom_kb() if is_admin else user_bottom_kb())
+
+# ── Inline Callback Handler ──────────────────────────
+async def on_cb(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    q = u.callback_query
+    await q.answer()
+    d = q.data; cid = q.message.chat_id; user = q.from_user
+    group_cid = int(CHAT_ID) if CHAT_ID else cid
+
+    if d.startswith("s_"):
+        if user.id != ADMIN_ID:
+            await q.message.reply_text("❌ Sirf admin."); return
+        await begin(ctx, group_cid, d[2:])
+
+    elif d == "yes_del":
+        if user.id != ADMIN_ID: return
+        ok, err = gh_write(Q_FILE, [], "Admin: delete all")
+        if ok: await q.message.reply_text("🗑 Saare questions delete ho gaye.")
+        else:  await q.message.reply_text(f"❌ Delete fail: {err}")
+
+    elif d == "no_del":
+        await q.message.reply_text("✅ Cancel. Kuch delete nahi hua.")
+
+    elif d == "back":
+        is_admin = user.id == ADMIN_ID
+        await q.message.reply_text(
+            "👇 Menu:",
+            reply_markup=bottom_kb() if is_admin else user_bottom_kb())
+
+# ── PDF handler ──────────────────────────────────────
+async def on_document(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    user = u.effective_user
+    if user.id != ADMIN_ID:
+        await u.message.reply_text("❌ Sirf admin."); return
+    doc = u.message.document
+    if not doc: return
+    fname = (doc.file_name or "").lower()
+    if not (fname.endswith(".pdf") or fname.endswith(".txt")):
+        await u.message.reply_text("⚠️ Sirf PDF ya TXT bhejo."); return
+
+    await u.message.reply_text(f"📄 Processing *{doc.file_name}*...", parse_mode="Markdown")
+    try:
+        tg_file = await ctx.bot.get_file(doc.file_id)
+        file_bytes = bytes(await tg_file.download_as_bytearray())
+        text = file_bytes.decode("utf-8", errors="ignore") if fname.endswith(".txt") else _pdf_extract(file_bytes)
+        parsed = parse_qs(text) or _pdf_parse_mcq(text)
+        if not parsed:
+            await u.message.reply_text(
+                "❌ Questions extract nahi ho sake.\n📋 Text Paste button use karo."); return
+        all_qs = load_qs(); all_qs.extend(parsed)
+        ok, err = gh_write(Q_FILE, all_qs, f"PDF: {len(parsed)} from {doc.file_name}")
+        if ok:
+            await u.message.reply_text(
+                f"✅ *{len(parsed)} questions add!*\nTotal: {len(all_qs)} 💾✅", parse_mode="Markdown")
+        else:
+            await u.message.reply_text(f"⚠️ {len(parsed)} questions parse hue, GitHub save fail.\n❌ {err}")
+    except Exception as e:
+        log.error("PDF: %s", e)
+        await u.message.reply_text(f"❌ Error: {str(e)[:150]}")
+
+def _pdf_extract(b: bytes) -> str:
+    try:
+        text = b.decode("latin-1", errors="ignore")
+        chunks = re.findall(r'\((.*?)\)', text)
+        result = " ".join(chunks)
+        result = re.sub(r'\\[nrt]', ' ', result)
+        return re.sub(r'\s+', ' ', result)[:50000]
+    except Exception:
+        return ""
+
+def _pdf_parse_mcq(text: str) -> list:
+    questions = []
+    blocks = re.split(r'(?:^|\s)(?:Q\.?\s*)?(\d+)[.)]\s+', text, flags=re.MULTILINE)
+    for block in blocks:
+        block = block.strip()
+        if len(block) < 20: continue
+        lines = [l.strip() for l in block.split('\n') if l.strip()]
+        if not lines: continue
+        q_text = lines[0]; opts = []; ans_idx = 0
+        for line in lines[1:]:
+            m = re.match(r'^[\(\[]?([A-Da-d])[\)\]\.]\s*(.+)', line)
+            if m: opts.append(m.group(2).strip()[:100])
+            a = re.search(r'(?:ans(?:wer)?|correct)[:\s]*([A-Da-d])', line, re.I)
+            if a: ans_idx = ord(a.group(1).upper()) - ord('A')
+        if q_text and len(opts) >= 2:
+            questions.append({
+                "question": q_text[:300], "question_hi": q_text[:300],
+                "question_en": q_text[:300], "options": opts[:4],
+                "answer_index": max(0, min(ans_idx, len(opts)-1)),
+                "subject": "General",
+            })
+    return questions[:200]
+
+# ════════════════════════════════════════════════════
+# GROQ AI
+# ════════════════════════════════════════════════════
+def groq_gen(subject, count=10):
+    if not GROQ_KEY: return []
+    prompt = (
+        f'Generate {count} MCQ for "{subject}" Indian Govt exams.\n'
+        'Return ONLY JSON array:\n'
+        '[{"question_hi":"हिंदी?","question_en":"English?",'
+        '"options":["A","B","C","D"],'
+        f'"answer_index":0,"subject":"{subject}"}}]'
+    )
+    try:
+        r = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {GROQ_KEY}", "Content-Type": "application/json"},
+            json={"model":"llama3-8b-8192",
+                  "messages":[{"role":"user","content":prompt}],
+                  "temperature":0.5,"max_tokens":4000},
+            timeout=30)
+        r.raise_for_status()
+        text = r.json()["choices"][0]["message"]["content"]
+        m = re.search(r"\[.*\]", text, re.DOTALL)
+        if m: return json.loads(m.group())
+    except Exception as e:
+        log.error("groq: %s", e)
+    return []
+
+# ════════════════════════════════════════════════════
+# POST INIT
+# ════════════════════════════════════════════════════
+async def post_init(app: Application):
+    ok, msg = check_github_token()
+    log.info("GitHub token: %s — %s", "OK" if ok else "FAIL", msg)
+    # Start scheduler as background task
+    asyncio.create_task(_scheduler(app))
+    log.info("Auto-scheduler started for times: %s IST", SCHEDULE_TIMES)
+
+# ════════════════════════════════════════════════════
+# MAIN
+# ════════════════════════════════════════════════════
+def main():
+    if not BOT_TOKEN:
+        log.error("BOT_TOKEN not set!"); return
+    log.info("Starting Bot v7.0...")
+    app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
+    app.add_handler(CommandHandler("start",       c_start))
+    app.add_handler(CommandHandler("test",        c_start))
+    app.add_handler(CommandHandler("status",      c_status))
+    app.add_handler(CommandHandler("leaderboard", c_lb))
+    app.add_handler(CommandHandler("stoptest",    c_stop))
+    app.add_handler(CommandHandler("addq",        c_addq))
+    app.add_handler(CommandHandler("myid",        c_myid))
+    app.add_handler(CommandHandler("ghcheck",     c_ghcheck))
+    app.add_handler(CallbackQueryHandler(on_cb))
+    app.add_handler(PollAnswerHandler(on_poll_ans))
+    app.add_handler(MessageHandler(filters.Document.ALL, on_document))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_msg))
+    log.info("Bot running!")
+    app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+
+if __name__ == "__main__":
+    main()
