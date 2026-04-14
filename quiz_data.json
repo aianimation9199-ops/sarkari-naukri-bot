@@ -1,1 +1,132 @@
-[]
+[
+  {
+    "subject": "Geography",
+    "question_hi": "भारत की सबसे लंबी सहायक नदी कौन सी है?",
+    "question_en": "Which is the longest tributary river of India?",
+    "answer_index": 1,
+    "options": [
+      "Gandak",
+      "Yamuna",
+      "Son",
+      "Gomti"
+    ],
+    "question": "भारत की सबसे लंबी सहायक नदी कौन सी है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "किस राज्य को 'भारत का धान का कटोरा' कहा जाता है?",
+    "question_en": "Which state is known as the 'Rice Bowl of India'?",
+    "answer_index": 2,
+    "options": [
+      "Punjab",
+      "Haryana",
+      "Andhra Pradesh",
+      "West Bengal"
+    ],
+    "question": "किस राज्य को 'भारत का धान का कटोरा' कहा जाता है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "भारत का सबसे ऊँचा जलप्रपात (Waterfall) कौन सा है?",
+    "question_en": "Which is the highest waterfall in India?",
+    "answer_index": 1,
+    "options": [
+      "Jog Falls",
+      "Kunchikal Falls",
+      "Dudhsagar Falls",
+      "Shivanasamudra Falls"
+    ],
+    "question": "भारत का सबसे ऊँचा जलप्रपात (Waterfall) कौन सा है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "भागीरथी और अलकनंदा का संगम कहाँ होता है?",
+    "question_en": "Where is the confluence of Bhagirathi and Alaknanda?",
+    "answer_index": 2,
+    "options": [
+      "Karnaprayag",
+      "Rudraprayag",
+      "Devprayag",
+      "Vishnuprayag"
+    ],
+    "question": "भागीरथी और अलकनंदा का संगम कहाँ होता है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'पीली क्रांति' (Yellow Revolution) का संबंध किसके उत्पादन से है?",
+    "question_en": "'Yellow Revolution' is associated with the production of?",
+    "answer_index": 1,
+    "options": [
+      "Pulses",
+      "Oilseeds",
+      "Gold",
+      "Fish"
+    ],
+    "question": "'पीली क्रांति' (Yellow Revolution) का संबंध किसके उत्पादन से है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "भारत और पाकिस्तान के बीच की सीमा रेखा क्या कहलाती है?",
+    "question_en": "What is the boundary line between India and Pakistan called?",
+    "answer_index": 2,
+    "options": [
+      "Mcmahon Line",
+      "Maginot Line",
+      "Redcliff Line",
+      "Durand Line"
+    ],
+    "question": "भारत और पाकिस्तान के बीच की सीमा रेखा क्या कहलाती है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "भारत का सबसे बड़ा मरुस्थल कौन सा है?",
+    "question_en": "Which is the largest desert in India?",
+    "answer_index": 2,
+    "options": [
+      "Sahara",
+      "Gobi",
+      "Thar",
+      "Ladakh"
+    ],
+    "question": "भारत का सबसे बड़ा मरुस्थल कौन सा है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "नाथुला दर्रा किस राज्य में स्थित है?",
+    "question_en": "In which state is Nathu La Pass located?",
+    "answer_index": 1,
+    "options": [
+      "Arunachal Pradesh",
+      "Sikkim",
+      "Himachal Pradesh",
+      "Uttarakhand"
+    ],
+    "question": "नाथुला दर्रा किस राज्य में स्थित है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "दक्षिण भारत की गंगा किस नदी को कहा जाता है?",
+    "question_en": "Which river is known as the 'Ganga of South India'?",
+    "answer_index": 1,
+    "options": [
+      "Krishna",
+      "Kaveri",
+      "Godavari",
+      "Narmada"
+    ],
+    "question": "दक्षिण भारत की गंगा किस नदी को कहा जाता है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "भारत में 'ब्लू माउंटेन' (Blue Mountains) किसे कहा जाता है?",
+    "question_en": "Which is known as 'Blue Mountains' in India?",
+    "answer_index": 1,
+    "options": [
+      "Khasi Hills",
+      "Nilgiri Hills",
+      "Cardamom Hills",
+      "Annamalai Hills"
+    ],
+    "question": "भारत में 'ब्लू माउंटेन' (Blue Mountains) किसे कहा जाता है?"
+  }
+]
