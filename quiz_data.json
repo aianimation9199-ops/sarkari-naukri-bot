@@ -1046,5 +1046,126 @@
       "ओडिशा / Odisha"
     ],
     "question": "बिहू (Bihu) किस राज्य का प्रसिद्ध त्यौहार है?"
+  },
+  {
+    "subject": "General",
+    "question_en": "Which is the largest state of India in terms of area?",
+    "answer_index": 0,
+    "options": [
+      "राजस्थान / Rajasthan",
+      "मध्य प्रदेश / Madhya Pradesh",
+      "महाराष्ट्र / Maharashtra",
+      "उत्तर प्रदेश / Uttar Pradesh"
+    ],
+    "question": "Which is the largest state of India in terms of area?"
+  },
+  {
+    "subject": "General",
+    "question_en": "'Kaziranga National Park' is famous for which animal?",
+    "answer_index": 0,
+    "options": [
+      "एक सींग वाला गेंडा / One-horned Rhinoceros",
+      "बंगाल टाइगर / Bengal Tiger",
+      "एशियाई हाथी / Asian Elephant",
+      "एशियाई शेर / Asiatic Lion"
+    ],
+    "question": "'Kaziranga National Park' is famous for which animal?"
+  },
+  {
+    "subject": "General",
+    "question_en": "Which state of India is called the 'Sugar Bowl'?",
+    "answer_index": 0,
+    "options": [
+      "उत्तर प्रदेश / Uttar Pradesh",
+      "पंजाब / Punjab",
+      "बिहार / Bihar",
+      "हरियाणा / Haryana"
+    ],
+    "question": "Which state of India is called the 'Sugar Bowl'?"
+  },
+  {
+    "subject": "General",
+    "question_en": "Teacher's Day is celebrated in whose memory?",
+    "answer_index": 0,
+    "options": [
+      "डॉ. सर्वपल्ली राधाकृष्णन / Dr. Sarvepalli Radhakrishnan",
+      "महात्मा गांधी / Mahatma Gandhi",
+      "जवाहरलाल नेहरू / Jawaharlal Nehru",
+      "डॉ. बी.आर. अंबेडकर / Dr. B.R. Ambedkar"
+    ],
+    "question": "Teacher's Day is celebrated in whose memory?"
+  },
+  {
+    "subject": "General",
+    "question_en": "In which state does the sun rise first in India?",
+    "answer_index": 0,
+    "options": [
+      "अरुणाचल प्रदेश / Arunachal Pradesh",
+      "सिक्किम / Sikkim",
+      "असम / Assam",
+      "मेघालय / Meghalaya"
+    ],
+    "question": "In which state does the sun rise first in India?"
+  },
+  {
+    "subject": "General",
+    "question_en": "Pongal is the main festival of which state?",
+    "answer_index": 0,
+    "options": [
+      "तमिलनाडु / Tamil Nadu",
+      "केरल / Kerala",
+      "कर्नाटक / Karnataka",
+      "आंध्र प्रदेश / Andhra Pradesh"
+    ],
+    "question": "Pongal is the main festival of which state?"
+  },
+  {
+    "subject": "General",
+    "question_en": "Who invented the telephone?",
+    "answer_index": 0,
+    "options": [
+      "अलेक्जेंडर ग्राहम बेल / Alexander Graham Bell",
+      "थॉमस एडिसन / Thomas Edison",
+      "आइजैक न्यूटन / Isaac Newton",
+      "मैरी क्यूरी / Marie Curie"
+    ],
+    "question": "Who invented the telephone?"
+  },
+  {
+    "subject": "General",
+    "question_en": "Which is the largest country in the world in terms of area?",
+    "answer_index": 0,
+    "options": [
+      "रूस / Russia",
+      "कनाडा / Canada",
+      "चीन / China",
+      "अमेरिका / USA"
+    ],
+    "question": "Which is the largest country in the world in terms of area?"
+  },
+  {
+    "subject": "General",
+    "question_en": "Hirakud Dam is built on which river?",
+    "answer_index": 0,
+    "options": [
+      "महानदी / Mahanadi",
+      "गंगा / Ganga",
+      "नर्मदा / Narmada",
+      "गोदावरी / Godavari"
+    ],
+    "question": "Hirakud Dam is built on which river?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "लौह पुरुष के नाम से किसे जाना जाता है?",
+    "question_en": "Who is known as the Iron Man of India?",
+    "answer_index": 0,
+    "options": [
+      "सरदार वल्लभभाई पटेल / Sardar Vallabhbhai Patel",
+      "सुभाष चंद्र बोस / Subhash Chandra Bose",
+      "लाला लाजपत राय / Lala Lajpat Rai",
+      "बाल गंगाधर तिलक / Bal Gangadhar Tilak"
+    ],
+    "question": "लौह पुरुष के नाम से किसे जाना जाता है?"
   }
 ]
