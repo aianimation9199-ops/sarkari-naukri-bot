@@ -916,5 +916,135 @@
       "प्राकृत संख्याएँ (Natural numbers)"
     ],
     "question": "गोले (Sphere) के पृष्ठीय क्षेत्रफल का सूत्र क्या है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "भारत का राष्ट्रीय पशु कौन सा है?",
+    "question_en": "Which is the national animal of India?",
+    "answer_index": 0,
+    "options": [
+      "बाघ / Tiger",
+      "शेर / Lion",
+      "हाथी / Elephant",
+      "घोड़ा / Horse"
+    ],
+    "question": "भारत का राष्ट्रीय पशु कौन सा है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "सूर्य के सबसे निकटतम ग्रह कौन सा है?",
+    "question_en": "Which is the nearest planet to the Sun?",
+    "answer_index": 0,
+    "options": [
+      "बुध / Mercury",
+      "शुक्र / Venus",
+      "पृथ्वी / Earth",
+      "मंगल / Mars"
+    ],
+    "question": "सूर्य के सबसे निकटतम ग्रह कौन सा है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "सौर मंडल का सबसे बड़ा ग्रह कौन सा है?",
+    "question_en": "Which is the largest planet in the solar system?",
+    "answer_index": 0,
+    "options": [
+      "बृहस्पति / Jupiter",
+      "शनि / Saturn",
+      "वरुण / Neptune",
+      "पृथ्वी / Earth"
+    ],
+    "question": "सौर मंडल का सबसे बड़ा ग्रह कौन सा है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "भारत की प्रथम महिला प्रधानमंत्री कौन थीं?",
+    "question_en": "Who was the first woman Prime Minister of India?",
+    "answer_index": 0,
+    "options": [
+      "इंदिरा गांधी / Indira Gandhi",
+      "सरोजिनी नायडू / Sarojini Naidu",
+      "प्रतिभा पाटिल / Pratibha Patil",
+      "सुष्मिता सेन / Sushmita Sen"
+    ],
+    "question": "भारत की प्रथम महिला प्रधानमंत्री कौन थीं?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "विटामिन C का सबसे अच्छा स्रोत क्या है?",
+    "question_en": "Which is the best source of Vitamin C?",
+    "answer_index": 0,
+    "options": [
+      "आंवला / Gooseberry",
+      "सेब / Apple",
+      "केला / Banana",
+      "दूध / Milk"
+    ],
+    "question": "विटामिन C का सबसे अच्छा स्रोत क्या है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "किस शहर को \"गुलाबी शहर\" (Pink City) के नाम से जाना जाता है?",
+    "question_en": "Which city is known as the \"Pink City\"?",
+    "answer_index": 0,
+    "options": [
+      "जयपुर / Jaipur",
+      "जोधपुर / Jodhpur",
+      "उदयपुर / Udaipur",
+      "अजमेर / Ajmer"
+    ],
+    "question": "किस शहर को \"गुलाबी शहर\" (Pink City) के नाम से जाना जाता है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "माउंट एवरेस्ट पर चढ़ने वाली पहली भारतीय महिला कौन थी?",
+    "question_en": "Who was the first Indian woman to climb Mount Everest?",
+    "answer_index": 0,
+    "options": [
+      "बछेंद्री पाल / Bachendri Pal",
+      "संतोष यादव / Santosh Yadav",
+      "पी.टी. उषा / P.T. Usha",
+      "दीपा कर्माकर / Dipa Karmakar"
+    ],
+    "question": "माउंट एवरेस्ट पर चढ़ने वाली पहली भारतीय महिला कौन थी?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "भारत में 'स्वर्ण मंदिर' कहाँ स्थित है?",
+    "question_en": "Where is the 'Golden Temple' located in India?",
+    "answer_index": 0,
+    "options": [
+      "अमृतसर / Amritsar",
+      "लुधियाना / Ludhiana",
+      "जालंधर / Jalandhar",
+      "पटियाला / Patiala"
+    ],
+    "question": "भारत में 'स्वर्ण मंदिर' कहाँ स्थित है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "मानव शरीर की सबसे बड़ी हड्डी कौन सी है?",
+    "question_en": "Which is the largest bone in the human body?",
+    "answer_index": 0,
+    "options": [
+      "फीमर / Femur",
+      "स्टेप्स / Stapes",
+      "टिबिया / Tibia",
+      "ह्यूमरस / Humerus"
+    ],
+    "question": "मानव शरीर की सबसे बड़ी हड्डी कौन सी है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "बिहू (Bihu) किस राज्य का प्रसिद्ध त्यौहार है?",
+    "question_en": "Bihu is a famous festival of which state?",
+    "answer_index": 0,
+    "options": [
+      "असम / Assam",
+      "बिहार / Bihar",
+      "बंगाल / Bengal",
+      "ओडिशा / Odisha"
+    ],
+    "question": "बिहू (Bihu) किस राज्य का प्रसिद्ध त्यौहार है?"
   }
 ]
