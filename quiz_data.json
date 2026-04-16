@@ -2125,5 +2125,135 @@
       "शांति भूषण"
     ],
     "question": "भारत में 'लोकपाल' शब्द का सर्वप्रथम प्रयोग किसने किया था?"
+  },
+  {
+    "subject": "Indian Constitution",
+    "question_hi": "'संसद का सचिवालय' (Secretariat of Parliament) का वर्णन संविधान के किस अनुच्छेद में किया गया है?",
+    "question_en": "In which article of the Constitution is the 'Secretariat of Parliament' described?",
+    "answer_index": 2,
+    "options": [
+      "अनुच्छेद 96",
+      "अनुच्छेद 97",
+      "अनुच्छेद 98",
+      "अनुच्छेद 100"
+    ],
+    "question": "'संसद का सचिवालय' (Secretariat of Parliament) का वर्णन संविधान के किस अनुच्छेद में किया गया है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'धन विधेयक' (Money Bill) के संबंध में विशेष प्रक्रिया का उल्लेख किस अनुच्छेद में है?",
+    "question_en": "In which article is the special procedure regarding 'Money Bill' mentioned?",
+    "answer_index": 0,
+    "options": [
+      "अनुच्छेद 109",
+      "अनुच्छेद 110",
+      "अनुच्छेद 111",
+      "अनुच्छेद 112"
+    ],
+    "question": "'धन विधेयक' (Money Bill) के संबंध में विशेष प्रक्रिया का उल्लेख किस अनुच्छेद में है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "संसद के दोनों सदनों की 'संयुक्त बैठक' (Joint Sitting) बुलाने का प्रावधान किस अनुच्छेद में है?",
+    "question_en": "Which article has the provision for calling a 'Joint Sitting' of both houses of Parliament?",
+    "answer_index": 1,
+    "options": [
+      "अनुच्छेद 105",
+      "अनुच्छेद 108",
+      "अनुच्छेद 110",
+      "अनुच्छेद 114"
+    ],
+    "question": "संसद के दोनों सदनों की 'संयुक्त बैठक' (Joint Sitting) बुलाने का प्रावधान किस अनुच्छेद में है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'वार्षिक वित्तीय विवरण' (Budget) का उल्लेख संविधान के किस अनुच्छेद में किया गया है?",
+    "question_en": "In which article of the Constitution is the 'Annual Financial Statement' (Budget) mentioned?",
+    "answer_index": 2,
+    "options": [
+      "अनुच्छेद 110",
+      "अनुच्छेद 111",
+      "अनुच्छेद 112",
+      "अनुच्छेद 115"
+    ],
+    "question": "'वार्षिक वित्तीय विवरण' (Budget) का उल्लेख संविधान के किस अनुच्छेद में किया गया है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "उच्चतम न्यायालय को 'अभिलेख न्यायालय' (Court of Record) होने की शक्ति कौन-सा अनुच्छेद प्रदान करता है?",
+    "question_en": "Which article gives the Supreme Court the power to be a 'Court of Record'?",
+    "answer_index": 2,
+    "options": [
+      "अनुच्छेद 124",
+      "अनुच्छेद 126",
+      "अनुच्छेद 129",
+      "अनुच्छेद 131"
+    ],
+    "question": "उच्चतम न्यायालय को 'अभिलेख न्यायालय' (Court of Record) होने की शक्ति कौन-सा अनुच्छेद प्रदान करता है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'भारत का नियंत्रक-महालेखापरीक्षक' (CAG) का वर्णन किस अनुच्छेद में है?",
+    "question_en": "In which article is the 'Controller and Auditor-General of India' (CAG) described?",
+    "answer_index": 0,
+    "options": [
+      "अनुच्छेद 148",
+      "अनुच्छेद 149",
+      "अनुच्छेद 151",
+      "अनुच्छेद 153"
+    ],
+    "question": "'भारत का नियंत्रक-महालेखापरीक्षक' (CAG) का वर्णन किस अनुच्छेद में है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "राज्य के 'महाधिवक्ता' (Advocate-General) की नियुक्ति किस अनुच्छेद के तहत की जाती है?",
+    "question_en": "Under which article is the 'Advocate-General' of the state appointed?",
+    "answer_index": 2,
+    "options": [
+      "अनुच्छेद 163",
+      "अनुच्छेद 164",
+      "अनुच्छेद 165",
+      "अनुच्छेद 167"
+    ],
+    "question": "राज्य के 'महाधिवक्ता' (Advocate-General) की नियुक्ति किस अनुच्छेद के तहत की जाती है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "किसी राज्य में 'विधान परिषद्' (Legislative Council) के सृजन या समाप्ति का प्रावधान किस अनुच्छेद में है?",
+    "question_en": "In which article is the provision for the creation or abolition of a 'Legislative Council' in a state?",
+    "answer_index": 1,
+    "options": [
+      "अनुच्छेद 168",
+      "अनुच्छेद 169",
+      "अनुच्छेद 170",
+      "अनुच्छेद 171"
+    ],
+    "question": "किसी राज्य में 'विधान परिषद्' (Legislative Council) के सृजन या समाप्ति का प्रावधान किस अनुच्छेद में है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "उच्च न्यायालय द्वारा 'रिट' (Writ) निकालने की शक्ति किस अनुच्छेद में वर्णित है?",
+    "question_en": "In which article is the power of the High Court to issue a 'Writ' described?",
+    "answer_index": 2,
+    "options": [
+      "अनुच्छेद 32",
+      "अनुच्छेद 224",
+      "अनुच्छेद 226",
+      "अनुच्छेद 228"
+    ],
+    "question": "उच्च न्यायालय द्वारा 'रिट' (Writ) निकालने की शक्ति किस अनुच्छेद में वर्णित है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'अन्तर्राज्यीय परिषद्' (Inter-State Council) के संबंध में उपबंध किस अनुच्छेद में दिया गया है?",
+    "question_en": "In which article is the provision regarding the 'Inter-State Council' given?",
+    "answer_index": 2,
+    "options": [
+      "अनुच्छेद 261",
+      "अनुच्छेद 262",
+      "अनुच्छेद 263",
+      "अनुच्छेद 280"
+    ],
+    "question": "'अन्तर्राज्यीय परिषद्' (Inter-State Council) के संबंध में उपबंध किस अनुच्छेद में दिया गया है?"
   }
 ]
