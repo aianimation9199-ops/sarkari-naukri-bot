@@ -1475,5 +1475,135 @@
       "अनुच्छेद 28"
     ],
     "question": "'अंतःकरण की और धर्म के अबाध रूप से मानने, आचरण और प्रचार करने की स्वतंत्रता' किस अनुच्छेद में है?"
+  },
+  {
+    "subject": "Indian Constitution",
+    "question_hi": "भारतीय संविधान के किस अनुच्छेद में 'ग्राम पंचायतों के संगठन' का उल्लेख किया गया है?",
+    "question_en": "In which article of the Indian Constitution is the 'Organization of village panchayats' mentioned?",
+    "answer_index": 2,
+    "options": [
+      "अनुच्छेद 38",
+      "अनुच्छेद 39",
+      "अनुच्छेद 40",
+      "अनुच्छेद 41"
+    ],
+    "question": "भारतीय संविधान के किस अनुच्छेद में 'ग्राम पंचायतों के संगठन' का उल्लेख किया गया है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'समान न्याय और निःशुल्क विधिक सहायता' का प्रावधान किस अनुच्छेद में है?",
+    "question_en": "Which article provides for 'Equal justice and free legal aid'?",
+    "answer_index": 1,
+    "options": [
+      "अनुच्छेद 39",
+      "अनुच्छेद 39-क",
+      "अनुच्छेद 43",
+      "अनुच्छेद 44"
+    ],
+    "question": "'समान न्याय और निःशुल्क विधिक सहायता' का प्रावधान किस अनुच्छेद में है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "नागरिकों के लिए 'एक समान सिविल संहिता' (Uniform Civil Code) का उल्लेख किस अनुच्छेद में है?",
+    "question_en": "In which article is the 'Uniform Civil Code' for citizens mentioned?",
+    "answer_index": 2,
+    "options": [
+      "अनुच्छेद 40",
+      "अनुच्छेद 42",
+      "अनुच्छेद 44",
+      "अनुच्छेद 45"
+    ],
+    "question": "नागरिकों के लिए 'एक समान सिविल संहिता' (Uniform Civil Code) का उल्लेख किस अनुच्छेद में है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'कार्यपालिका से न्यायपालिका का पृथक्करण' किस अनुच्छेद के अंतर्गत आता है?",
+    "question_en": "'Separation of judiciary from executive' comes under which article?",
+    "answer_index": 2,
+    "options": [
+      "अनुच्छेद 48",
+      "अनुच्छेद 49",
+      "अनुच्छेद 50",
+      "अनुच्छेद 51"
+    ],
+    "question": "'कार्यपालिका से न्यायपालिका का पृथक्करण' किस अनुच्छेद के अंतर्गत आता है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "संविधान के किस भाग में 'मूल कर्तव्यों' (Fundamental Duties) का वर्णन है?",
+    "question_en": "In which part of the Constitution are 'Fundamental Duties' described?",
+    "answer_index": 1,
+    "options": [
+      "भाग-IV",
+      "भाग-IV (क)",
+      "भाग-V",
+      "भाग-VI"
+    ],
+    "question": "संविधान के किस भाग में 'मूल कर्तव्यों' (Fundamental Duties) का वर्णन है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "वर्तमान में संविधान में कुल कितने 'मूल कर्तव्य' निर्धारित हैं?",
+    "question_en": "How many total 'Fundamental Duties' are currently prescribed in the Constitution?",
+    "answer_index": 2,
+    "options": [
+      "8",
+      "10",
+      "11",
+      "12"
+    ],
+    "question": "वर्तमान में संविधान में कुल कितने 'मूल कर्तव्य' निर्धारित हैं?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'भारत का एक राष्ट्रपति होगा', यह किस अनुच्छेद में कहा गया है?",
+    "question_en": "'There shall be a President of India', in which article is this stated?",
+    "answer_index": 0,
+    "options": [
+      "अनुच्छेद 52",
+      "अनुच्छेद 53",
+      "अनुच्छेद 54",
+      "अनुच्छेद 61"
+    ],
+    "question": "'भारत का एक राष्ट्रपति होगा', यह किस अनुच्छेद में कहा गया है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "राष्ट्रपति पर 'महाभियोग' (Impeachment) चलाने की प्रक्रिया किस अनुच्छेद में दी गई है?",
+    "question_en": "In which article is the procedure for 'Impeachment' of the President given?",
+    "answer_index": 1,
+    "options": [
+      "अनुच्छेद 60",
+      "अनुच्छेद 61",
+      "अनुच्छेद 62",
+      "अनुच्छेद 72"
+    ],
+    "question": "राष्ट्रपति पर 'महाभियोग' (Impeachment) चलाने की प्रक्रिया किस अनुच्छेद में दी गई है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "राष्ट्रपति को 'क्षमा आदि की शक्ति' किस अनुच्छेद के तहत प्राप्त है?",
+    "question_en": "Under which article does the President have the 'Power to grant pardons etc.'?",
+    "answer_index": 1,
+    "options": [
+      "अनुच्छेद 71",
+      "अनुच्छेद 72",
+      "अनुच्छेद 74",
+      "अनुच्छेद 76"
+    ],
+    "question": "राष्ट्रपति को 'क्षमा आदि की शक्ति' किस अनुच्छेद के तहत प्राप्त है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'भारत का महान्यायवादी' (Attorney General of India) की नियुक्ति किस अनुच्छेद के तहत की जाती है?",
+    "question_en": "Under which article is the 'Attorney General of India' appointed?",
+    "answer_index": 2,
+    "options": [
+      "अनुच्छेद 74",
+      "अनुच्छेद 75",
+      "अनुच्छेद 76",
+      "अनुच्छेद 78"
+    ],
+    "question": "'भारत का महान्यायवादी' (Attorney General of India) की नियुक्ति किस अनुच्छेद के तहत की जाती है?"
   }
 ]
