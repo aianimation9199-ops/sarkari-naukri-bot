@@ -2255,5 +2255,135 @@
       "अनुच्छेद 280"
     ],
     "question": "'अन्तर्राज्यीय परिषद्' (Inter-State Council) के संबंध में उपबंध किस अनुच्छेद में दिया गया है?"
+  },
+  {
+    "subject": "Indian Constitution",
+    "question_hi": "'भारत का निर्वाचन आयोग' (Election Commission of India) अपनी शक्तियाँ सीधे किससे प्राप्त करता है?",
+    "question_en": "From whom does the 'Election Commission of India' directly derive its powers?",
+    "answer_index": 2,
+    "options": [
+      "संसद से",
+      "राष्ट्रपति से",
+      "भारतीय संविधान से",
+      "प्रधानमंत्री कार्यालय से"
+    ],
+    "question": "'भारत का निर्वाचन आयोग' (Election Commission of India) अपनी शक्तियाँ सीधे किससे प्राप्त करता है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "मुख्य निर्वाचन आयुक्त एवं अन्य निर्वाचन आयुक्तों का कार्यकाल कितना होता है?",
+    "question_en": "What is the tenure of the Chief Election Commissioner and other Election Commissioners?",
+    "answer_index": 1,
+    "options": [
+      "5 वर्ष या 62 वर्ष की आयु",
+      "6 वर्ष या 65 वर्ष की आयु",
+      "5 वर्ष या 65 वर्ष की आयु",
+      "6 वर्ष या 70 वर्ष की आयु"
+    ],
+    "question": "मुख्य निर्वाचन आयुक्त एवं अन्य निर्वाचन आयुक्तों का कार्यकाल कितना होता है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'संघ लोक सेवा आयोग' (UPSC) अपनी वार्षिक रिपोर्ट (Annual Report) किसे प्रस्तुत करता है?",
+    "question_en": "To whom does the 'Union Public Service Commission' (UPSC) submit its annual report?",
+    "answer_index": 2,
+    "options": [
+      "संसद को",
+      "गृह मंत्री को",
+      "राष्ट्रपति को",
+      "कार्मिक विभाग को"
+    ],
+    "question": "'संघ लोक सेवा आयोग' (UPSC) अपनी वार्षिक रिपोर्ट (Annual Report) किसे प्रस्तुत करता है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "राज्य लोक सेवा आयोग के अध्यक्ष एवं सदस्यों को पद से हटाने का अधिकार किसे है?",
+    "question_en": "Who has the authority to remove the Chairman and members of the State Public Service Commission from office?",
+    "answer_index": 1,
+    "options": [
+      "राज्यपाल को",
+      "राष्ट्रपति को",
+      "मुख्यमंत्री को",
+      "राज्य विधानसभा को"
+    ],
+    "question": "राज्य लोक सेवा आयोग के अध्यक्ष एवं सदस्यों को पद से हटाने का अधिकार किसे है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "प्रथम वित्त आयोग (First Finance Commission) के अध्यक्ष कौन थे?",
+    "question_en": "Who was the Chairman of the First Finance Commission?",
+    "answer_index": 2,
+    "options": [
+      "के. सी. पंत",
+      "एन. के. सिंह",
+      "के. सी. नियोगी",
+      "वाई. वी. रेड्डी"
+    ],
+    "question": "प्रथम वित्त आयोग (First Finance Commission) के अध्यक्ष कौन थे?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'राष्ट्रीय अनुसूचित जनजाति आयोग' का गठन किस संविधान संशोधन द्वारा किया गया?",
+    "question_en": "By which constitutional amendment was the 'National Commission for Scheduled Tribes' constituted?",
+    "answer_index": 2,
+    "options": [
+      "65वां संशोधन",
+      "86वां संशोधन",
+      "89वां संशोधन",
+      "91वां संशोधन"
+    ],
+    "question": "'राष्ट्रीय अनुसूचित जनजाति आयोग' का गठन किस संविधान संशोधन द्वारा किया गया?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'राष्ट्रीय पिछड़ा वर्ग आयोग' को किस अनुच्छेद के तहत संवैधानिक दर्जा दिया गया है?",
+    "question_en": "Under which article has the 'National Commission for Backward Classes' been given constitutional status?",
+    "answer_index": 2,
+    "options": [
+      "अनुच्छेद 338",
+      "अनुच्छेद 338 क",
+      "अनुच्छेद 338 ख",
+      "अनुच्छेद 340"
+    ],
+    "question": "'राष्ट्रीय पिछड़ा वर्ग आयोग' को किस अनुच्छेद के तहत संवैधानिक दर्जा दिया गया है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'वस्तु एवं सेवा कर (GST) परिषद' का अध्यक्ष कौन होता है?",
+    "question_en": "Who is the Chairman of the 'Goods and Services Tax (GST) Council'?",
+    "answer_index": 2,
+    "options": [
+      "भारत का राष्ट्रपति",
+      "भारत का प्रधानमंत्री",
+      "भारत का वित्त मंत्री",
+      "नीति आयोग का उपाध्यक्ष"
+    ],
+    "question": "'वस्तु एवं सेवा कर (GST) परिषद' का अध्यक्ष कौन होता है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'केन्द्रीय सतर्कता आयोग' (CVC) की स्थापना किस समिति की सिफारिश पर की गई थी?",
+    "question_en": "On the recommendation of which committee was the 'Central Vigilance Commission' (CVC) established?",
+    "answer_index": 0,
+    "options": [
+      "संथानम समिति",
+      "स्वर्ण सिंह समिति",
+      "बलवंत राय मेहता समिति",
+      "दिनेश गोस्वामी समिति"
+    ],
+    "question": "'केन्द्रीय सतर्कता आयोग' (CVC) की स्थापना किस समिति की सिफारिश पर की गई थी?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'केन्द्रीय अन्वेषण ब्यूरो' (CBI) के निदेशक का कार्यकाल न्यूनतम कितने वर्ष का होता है?",
+    "question_en": "What is the minimum tenure (in years) of the Director of the 'Central Bureau of Investigation' (CBI)?",
+    "answer_index": 1,
+    "options": [
+      "1 वर्ष",
+      "2 वर्ष",
+      "3 वर्ष",
+      "5 वर्ष"
+    ],
+    "question": "'केन्द्रीय अन्वेषण ब्यूरो' (CBI) के निदेशक का कार्यकाल न्यूनतम कितने वर्ष का होता है?"
   }
 ]
