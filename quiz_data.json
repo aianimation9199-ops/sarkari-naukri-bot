@@ -1215,5 +1215,135 @@
       "J.B. Kripalani"
     ],
     "question": "Who was the Chairman of the Drafting Committee?"
+  },
+  {
+    "subject": "Indian Constitution",
+    "question_hi": "भारत में ईस्ट इंडिया कंपनी के कार्यों को नियमित करने के लिए ब्रिटिश सरकार द्वारा उठाया गया पहला कदम कौन-सा था?",
+    "question_en": "Which was the first step taken by the British government to regulate the activities of the East India Company in India?",
+    "answer_index": 1,
+    "options": [
+      "Act of Settlement-1781",
+      "Regulating Act-1773",
+      "Pitts India Act-1784",
+      "Charter Act-1813"
+    ],
+    "question": "भारत में ईस्ट इंडिया कंपनी के कार्यों को नियमित करने के लिए ब्रिटिश सरकार द्वारा उठाया गया पहला कदम कौन-सा था?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "कलकत्ता में सुप्रीम कोर्ट की स्थापना किस वर्ष की गई थी?",
+    "question_en": "In which year was the Supreme Court established in Calcutta?",
+    "answer_index": 1,
+    "options": [
+      "1773",
+      "1774",
+      "1781",
+      "1784"
+    ],
+    "question": "कलकत्ता में सुप्रीम कोर्ट की स्थापना किस वर्ष की गई थी?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "किस अधिनियम के तहत बंगाल के गवर्नर जनरल को 'भारत का गवर्नर जनरल' कहा जाने लगा?",
+    "question_en": "Under which act was the Governor General of Bengal called the 'Governor General of India'?",
+    "answer_index": 1,
+    "options": [
+      "Charter Act-1813",
+      "Charter Act-1833",
+      "Charter Act-1853",
+      "Govt. of India Act-1858"
+    ],
+    "question": "किस अधिनियम के तहत बंगाल के गवर्नर जनरल को 'भारत का गवर्नर जनरल' कहा जाने लगा?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "भारत का प्रथम गवर्नर जनरल कौन बना?",
+    "question_en": "Who became the first Governor General of India?",
+    "answer_index": 2,
+    "options": [
+      "Warren Hastings",
+      "Lord Canning",
+      "Lord William Bentinck",
+      "Lord Mountbatten"
+    ],
+    "question": "भारत का प्रथम गवर्नर जनरल कौन बना?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "भारतीय संविधान सभा की प्रथम बैठक कब आयोजित की गई थी?",
+    "question_en": "When was the first meeting of the Indian Constituent Assembly held?",
+    "answer_index": 0,
+    "options": [
+      "9 December 1946",
+      "11 December 1946",
+      "13 December 1946",
+      "26 January 1947"
+    ],
+    "question": "भारतीय संविधान सभा की प्रथम बैठक कब आयोजित की गई थी?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "संविधान सभा के 'अस्थायी अध्यक्ष' (Temporary President) के रूप में किसे चुना गया था?",
+    "question_en": "Who was elected as the 'Temporary President' of the Constituent Assembly?",
+    "answer_index": 2,
+    "options": [
+      "Dr. Rajendra Prasad",
+      "Dr. B.R. Ambedkar",
+      "Dr. Sachchidananda Sinha",
+      "B.N. Rau"
+    ],
+    "question": "संविधान सभा के 'अस्थायी अध्यक्ष' (Temporary President) के रूप में किसे चुना गया था?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "संविधान सभा के 'संवैधानिक सलाहकार' (Constitutional Advisor) कौन नियुक्त किए गए थे?",
+    "question_en": "Who was appointed as the 'Constitutional Advisor' to the Constituent Assembly?",
+    "answer_index": 1,
+    "options": [
+      "H.C. Mukherjee",
+      "B.N. Rau",
+      "Jawaharlal Nehru",
+      "Sardar Patel"
+    ],
+    "question": "संविधान सभा के 'संवैधानिक सलाहकार' (Constitutional Advisor) कौन नियुक्त किए गए थे?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'उद्देश्य प्रस्ताव' (Objective Resolution) किसके द्वारा पेश किया गया था?",
+    "question_en": "By whom was the 'Objective Resolution' introduced?",
+    "answer_index": 2,
+    "options": [
+      "Dr. Rajendra Prasad",
+      "Mahatma Gandhi",
+      "Jawaharlal Nehru",
+      "Dr. B.R. Ambedkar"
+    ],
+    "question": "'उद्देश्य प्रस्ताव' (Objective Resolution) किसके द्वारा पेश किया गया था?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "भारतीय संविधान को बनने में कुल कितना समय लगा?",
+    "question_en": "How much total time did it take to make the Indian Constitution?",
+    "answer_index": 0,
+    "options": [
+      "2 years, 11 months, 18 days",
+      "3 years, 10 months, 5 days",
+      "2 years, 8 months, 20 days",
+      "1 year, 11 months, 18 days"
+    ],
+    "question": "भारतीय संविधान को बनने में कुल कितना समय लगा?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "प्रारूप समिति (Drafting Committee) के अध्यक्ष कौन थे?",
+    "question_en": "Who was the Chairman of the Drafting Committee?",
+    "answer_index": 1,
+    "options": [
+      "Dr. Rajendra Prasad",
+      "Dr. B.R. Ambedkar",
+      "Sardar Patel",
+      "J.B. Kripalani"
+    ],
+    "question": "प्रारूप समिति (Drafting Committee) के अध्यक्ष कौन थे?"
   }
 ]
