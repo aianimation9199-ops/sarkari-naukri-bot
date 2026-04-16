@@ -1865,5 +1865,135 @@
       "70 वर्ष"
     ],
     "question": "उच्चतम न्यायालय के न्यायाधीशों की सेवानिवृत्ति (Retirement) की आयु कितनी निर्धारित है?"
+  },
+  {
+    "subject": "Indian Constitution",
+    "question_hi": "भारतीय संविधान में 'आपातकालीन उपबंध' (Emergency Provisions) किस देश के संविधान से प्रेरित हैं?",
+    "question_en": "From which country's constitution are the 'Emergency Provisions' in the Indian Constitution inspired?",
+    "answer_index": 1,
+    "options": [
+      "अमेरिका",
+      "जर्मनी (वाइमर संविधान)",
+      "कनाडा",
+      "आयरलैंड"
+    ],
+    "question": "भारतीय संविधान में 'आपातकालीन उपबंध' (Emergency Provisions) किस देश के संविधान से प्रेरित हैं?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "संविधान के किस अनुच्छेद के तहत राज्यों में 'राष्ट्रपति शासन' (President's Rule) लागू किया जाता है?",
+    "question_en": "Under which article of the Constitution is 'President's Rule' imposed in the states?",
+    "answer_index": 1,
+    "options": [
+      "अनुच्छेद 352",
+      "अनुच्छेद 356",
+      "अनुच्छेद 360",
+      "अनुच्छेद 365"
+    ],
+    "question": "संविधान के किस अनुच्छेद के तहत राज्यों में 'राष्ट्रपति शासन' (President's Rule) लागू किया जाता है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "भारत में अब तक कितनी बार 'वित्तीय आपातकाल' (Financial Emergency) घोषित किया गया है?",
+    "question_en": "How many times has 'Financial Emergency' been declared in India so far?",
+    "answer_index": 3,
+    "options": [
+      "एक बार",
+      "दो बार",
+      "तीन बार",
+      "कभी नहीं"
+    ],
+    "question": "भारत में अब तक कितनी बार 'वित्तीय आपातकाल' (Financial Emergency) घोषित किया गया है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'नीति आयोग' (NITI Aayog) की स्थापना किस तिथि को की गई थी?",
+    "question_en": "On which date was 'NITI Aayog' established?",
+    "answer_index": 1,
+    "options": [
+      "15 अगस्त 2014",
+      "1 जनवरी 2015",
+      "26 जनवरी 2015",
+      "1 अप्रैल 2015"
+    ],
+    "question": "'नीति आयोग' (NITI Aayog) की स्थापना किस तिथि को की गई थी?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "किस संविधान संशोधन द्वारा दिल्ली को 'राष्ट्रीय राजधानी क्षेत्र' (NCR) का दर्जा दिया गया?",
+    "question_en": "By which constitutional amendment was Delhi given the status of 'National Capital Region' (NCR)?",
+    "answer_index": 1,
+    "options": [
+      "61वां संशोधन",
+      "69वां संशोधन",
+      "70वां संशोधन",
+      "84वां संशोधन"
+    ],
+    "question": "किस संविधान संशोधन द्वारा दिल्ली को 'राष्ट्रीय राजधानी क्षेत्र' (NCR) का दर्जा दिया गया?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'संघ लोक सेवा आयोग' (UPSC) के अध्यक्ष एवं सदस्यों की नियुक्ति किसके द्वारा की जाती है?",
+    "question_en": "By whom are the Chairman and members of the 'Union Public Service Commission' (UPSC) appointed?",
+    "answer_index": 1,
+    "options": [
+      "प्रधानमंत्री",
+      "राष्ट्रपति",
+      "मुख्य न्यायाधीश",
+      "लोकसभा अध्यक्ष"
+    ],
+    "question": "'संघ लोक सेवा आयोग' (UPSC) के अध्यक्ष एवं सदस्यों की नियुक्ति किसके द्वारा की जाती है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "संविधान का कौन-सा अनुच्छेद 'संवैधानिक उपचारों के अधिकार' (Right to Constitutional Remedies) से संबंधित है?",
+    "question_en": "Which article of the Constitution is related to the 'Right to Constitutional Remedies'?",
+    "answer_index": 3,
+    "options": [
+      "अनुच्छेद 19",
+      "अनुच्छेद 21",
+      "अनुच्छेद 31",
+      "अनुच्छेद 32"
+    ],
+    "question": "संविधान का कौन-सा अनुच्छेद 'संवैधानिक उपचारों के अधिकार' (Right to Constitutional Remedies) से संबंधित है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'राज्य मानवाधिकार आयोग' के अध्यक्ष एवं सदस्यों की नियुक्ति कौन करता है?",
+    "question_en": "Who appoints the Chairman and members of the 'State Human Rights Commission'?",
+    "answer_index": 1,
+    "options": [
+      "राष्ट्रपति",
+      "राज्यपाल",
+      "मुख्यमंत्री",
+      "उच्च न्यायालय का मुख्य न्यायाधीश"
+    ],
+    "question": "'राज्य मानवाधिकार आयोग' के अध्यक्ष एवं सदस्यों की नियुक्ति कौन करता है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "संविधान की 'दसवीं अनुसूची' (10th Schedule) को किस संशोधन द्वारा जोड़ा गया था?",
+    "question_en": "By which amendment was the '10th Schedule' of the Constitution added?",
+    "answer_index": 2,
+    "options": [
+      "42वां संशोधन",
+      "44वां संशोधन",
+      "52वां संशोधन",
+      "61वां संशोधन"
+    ],
+    "question": "संविधान की 'दसवीं अनुसूची' (10th Schedule) को किस संशोधन द्वारा जोड़ा गया था?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "बिहार में अब तक कुल कितनी बार 'राष्ट्रपति शासन' लागू किया गया है?",
+    "question_en": "How many times in total has 'President's Rule' been imposed in Bihar so far?",
+    "answer_index": 2,
+    "options": [
+      "5 बार",
+      "7 बार",
+      "8 बार",
+      "10 बार"
+    ],
+    "question": "बिहार में अब तक कुल कितनी बार 'राष्ट्रपति शासन' लागू किया गया है?"
   }
 ]
