@@ -1605,5 +1605,135 @@
       "अनुच्छेद 78"
     ],
     "question": "'भारत का महान्यायवादी' (Attorney General of India) की नियुक्ति किस अनुच्छेद के तहत की जाती है?"
+  },
+  {
+    "subject": "Indian Constitution",
+    "question_hi": "भारत के प्रत्येक नागरिक का यह कर्तव्य होगा कि वह संविधान का पालन करे और उसके आदर्शों, संस्थाओं, राष्ट्र ध्वज और राष्ट्रगान का आदर करे। यह किस अनुच्छेद में वर्णित है?",
+    "question_en": "It shall be the duty of every citizen of India to abide by the Constitution and respect its ideals, institutions, the National Flag and the National Anthem. In which article is this described?",
+    "answer_index": 1,
+    "options": [
+      "अनुच्छेद 51",
+      "अनुच्छेद 51 क",
+      "अनुच्छेद 52",
+      "अनुच्छेद 53"
+    ],
+    "question": "भारत के प्रत्येक नागरिक का यह कर्तव्य होगा कि वह संविधान का पालन करे और उसके आदर्शों, संस्थाओं, राष्ट्र ध्वज और राष्ट्रगान का आदर करे। यह किस अनुच्छेद में वर्णित है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "राष्ट्रपति के निर्वाचन के लिए नामांकन हेतु उम्मीदवार के पास कम से कम कितने प्रस्तावक एवं अनुमोदक होने चाहिए?",
+    "question_en": "For the nomination of the Presidential election, how many proposers and seconders should a candidate have at least?",
+    "answer_index": 1,
+    "options": [
+      "20 प्रस्तावक एवं 20 अनुमोदक",
+      "50 प्रस्तावक एवं 50 अनुमोदक",
+      "100 प्रस्तावक एवं 100 अनुमोदक",
+      "10 प्रस्तावक एवं 10 अनुमोदक"
+    ],
+    "question": "राष्ट्रपति के निर्वाचन के लिए नामांकन हेतु उम्मीदवार के पास कम से कम कितने प्रस्तावक एवं अनुमोदक होने चाहिए?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'धन विधेयक' (Money Bill) की परिभाषा संविधान के किस अनुच्छेद में दी गई है?",
+    "question_en": "In which article of the Constitution is the definition of 'Money Bill' given?",
+    "answer_index": 2,
+    "options": [
+      "अनुच्छेद 108",
+      "अनुच्छेद 109",
+      "अनुच्छेद 110",
+      "अनुच्छेद 112"
+    ],
+    "question": "'धन विधेयक' (Money Bill) की परिभाषा संविधान के किस अनुच्छेद में दी गई है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "लोकसभा का अध्यक्ष अपना त्यागपत्र किसे सौंपता है?",
+    "question_en": "To whom does the Speaker of the Lok Sabha submit his resignation?",
+    "answer_index": 2,
+    "options": [
+      "राष्ट्रपति को",
+      "प्रधानमंत्री को",
+      "लोकसभा के उपाध्यक्ष को",
+      "मुख्य न्यायाधीश को"
+    ],
+    "question": "लोकसभा का अध्यक्ष अपना त्यागपत्र किसे सौंपता है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "स्वतंत्र भारत के पहले मंत्रिमंडल में 'शिक्षा मंत्री' कौन थे?",
+    "question_en": "Who was the 'Education Minister' in the first cabinet of independent India?",
+    "answer_index": 1,
+    "options": [
+      "डॉ. बी.आर. अम्बेडकर",
+      "मौलाना अबुल कलाम आजाद",
+      "डॉ. जॉन मथाई",
+      "राजकुमारी अमृत कौर"
+    ],
+    "question": "स्वतंत्र भारत के पहले मंत्रिमंडल में 'शिक्षा मंत्री' कौन थे?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "संविधान के किस अनुच्छेद के तहत राज्यपाल को 'अध्यादेश' (Ordinance) जारी करने की शक्ति प्राप्त है?",
+    "question_en": "Under which article of the Constitution does the Governor have the power to issue an 'Ordinance'?",
+    "answer_index": 1,
+    "options": [
+      "अनुच्छेद 123",
+      "अनुच्छेद 213",
+      "अनुच्छेद 214",
+      "अनुच्छेद 161"
+    ],
+    "question": "संविधान के किस अनुच्छेद के तहत राज्यपाल को 'अध्यादेश' (Ordinance) जारी करने की शक्ति प्राप्त है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "भारतीय संविधान में 'समवर्ती सूची' (Concurrent List) की अवधारणा किस देश के संविधान से ली गई है?",
+    "question_en": "From which country's constitution was the concept of the 'Concurrent List' taken in the Indian Constitution?",
+    "answer_index": 1,
+    "options": [
+      "कनाडा",
+      "ऑस्ट्रेलिया",
+      "अमेरिका",
+      "दक्षिण अफ्रीका"
+    ],
+    "question": "भारतीय संविधान में 'समवर्ती सूची' (Concurrent List) की अवधारणा किस देश के संविधान से ली गई है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "भाषा के आधार पर गठित होने वाला भारत का पहला राज्य कौन-सा है?",
+    "question_en": "Which is the first state of India to be formed on the basis of language?",
+    "answer_index": 1,
+    "options": [
+      "बिहार",
+      "आंध्र प्रदेश",
+      "महाराष्ट्र",
+      "गुजरात"
+    ],
+    "question": "भाषा के आधार पर गठित होने वाला भारत का पहला राज्य कौन-सा है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'लोक लेखा समिति' (Public Accounts Committee) में कुल कितने सदस्य होते हैं?",
+    "question_en": "How many total members are there in the 'Public Accounts Committee'?",
+    "answer_index": 0,
+    "options": [
+      "15 सदस्य",
+      "22 सदस्य",
+      "30 सदस्य",
+      "45 सदस्य"
+    ],
+    "question": "'लोक लेखा समिति' (Public Accounts Committee) में कुल कितने सदस्य होते हैं?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "उच्चतम न्यायालय के न्यायाधीशों की सेवानिवृत्ति (Retirement) की आयु कितनी निर्धारित है?",
+    "question_en": "What is the prescribed retirement age for the judges of the Supreme Court?",
+    "answer_index": 2,
+    "options": [
+      "60 वर्ष",
+      "62 वर्ष",
+      "65 वर्ष",
+      "70 वर्ष"
+    ],
+    "question": "उच्चतम न्यायालय के न्यायाधीशों की सेवानिवृत्ति (Retirement) की आयु कितनी निर्धारित है?"
   }
 ]
