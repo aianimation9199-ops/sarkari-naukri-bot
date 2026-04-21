@@ -2892,5 +2892,135 @@
       "1950"
     ],
     "question": "संघीय न्यायालय (Federal Court) की स्थापना किस वर्ष हुई थी?"
+  },
+  {
+    "subject": "Indian Constitution",
+    "question_hi": "'नीति आयोग' का पदेन अध्यक्ष कौन होता है?",
+    "question_en": "Who is the ex-officio Chairman of 'NITI Aayog'?",
+    "answer_index": 1,
+    "options": [
+      "राष्ट्रपति",
+      "प्रधानमंत्री",
+      "वित्त मंत्री",
+      "योजना मंत्री"
+    ],
+    "question": "'नीति आयोग' का पदेन अध्यक्ष कौन होता है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "संविधान का अनुच्छेद-360 निम्नलिखित में से किससे संबंधित है?",
+    "question_en": "Article 360 of the Constitution is related to which of the following?",
+    "answer_index": 2,
+    "options": [
+      "राष्ट्रीय आपातकाल",
+      "राष्ट्रपति शासन",
+      "वित्तीय आपातकाल",
+      "संविधान संशोधन"
+    ],
+    "question": "संविधान का अनुच्छेद-360 निम्नलिखित में से किससे संबंधित है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'राष्ट्रीय आपातकाल' के दौरान कौन-से अनुच्छेद (मूल अधिकार) निलंबित नहीं किए जा सकते?",
+    "question_en": "Which articles (Fundamental Rights) cannot be suspended during a 'National Emergency'?",
+    "answer_index": 2,
+    "options": [
+      "अनुच्छेद 14 और 15",
+      "अनुच्छेद 19 और 20",
+      "अनुच्छेद 20 और 21",
+      "अनुच्छेद 21 और 22"
+    ],
+    "question": "'राष्ट्रीय आपातकाल' के दौरान कौन-से अनुच्छेद (मूल अधिकार) निलंबित नहीं किए जा सकते?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "स्वतंत्र भारत के प्रथम 'विधि मंत्री' (Law Minister) कौन थे?",
+    "question_en": "Who was the first 'Law Minister' of independent India?",
+    "answer_index": 2,
+    "options": [
+      "जवाहरलाल नेहरू",
+      "सरदार वल्लभ भाई पटेल",
+      "डॉ. बी.आर. अम्बेडकर",
+      "मौलाना अबुल कलाम आजाद"
+    ],
+    "question": "स्वतंत्र भारत के प्रथम 'विधि मंत्री' (Law Minister) कौन थे?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'स्वर्ण सिंह समिति' की सिफारिश पर संविधान में क्या जोड़ा गया था?",
+    "question_en": "What was added to the Constitution on the recommendation of the 'Swaran Singh Committee'?",
+    "answer_index": 2,
+    "options": [
+      "मूल अधिकार",
+      "नीति निदेशक तत्व",
+      "मूल कर्तव्य",
+      "पंचायती राज"
+    ],
+    "question": "'स्वर्ण सिंह समिति' की सिफारिश पर संविधान में क्या जोड़ा गया था?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "संविधान सभा द्वारा 'राष्ट्रीय गान' (National Anthem) को कब अपनाया गया?",
+    "question_en": "When was the 'National Anthem' adopted by the Constituent Assembly?",
+    "answer_index": 1,
+    "options": [
+      "22 जुलाई 1947",
+      "24 जनवरी 1950",
+      "26 जनवरी 1950",
+      "15 अगस्त 1947"
+    ],
+    "question": "संविधान सभा द्वारा 'राष्ट्रीय गान' (National Anthem) को कब अपनाया गया?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'समान नागरिक संहिता' (Uniform Civil Code) लागू करने वाला भारत का एकमात्र राज्य कौन-सा है?",
+    "question_en": "Which is the only state in India to implement the 'Uniform Civil Code'?",
+    "answer_index": 2,
+    "options": [
+      "बिहार",
+      "उत्तर प्रदेश",
+      "गोवा",
+      "केरल"
+    ],
+    "question": "'समान नागरिक संहिता' (Uniform Civil Code) लागू करने वाला भारत का एकमात्र राज्य कौन-सा है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "किस अनुच्छेद के तहत राष्ट्रपति को 'अध्यादेश' (Ordinance) जारी करने की शक्ति प्राप्त है?",
+    "question_en": "Under which article does the President have the power to issue an 'Ordinance'?",
+    "answer_index": 1,
+    "options": [
+      "अनुच्छेद 111",
+      "अनुच्छेद 123",
+      "अनुच्छेद 213",
+      "अनुच्छेद 352"
+    ],
+    "question": "किस अनुच्छेद के तहत राष्ट्रपति को 'अध्यादेश' (Ordinance) जारी करने की शक्ति प्राप्त है?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "'लोकसभा' का सदस्य चुने जाने के लिए न्यूनतम आयु क्या होनी चाहिए?",
+    "question_en": "What should be the minimum age to be elected as a member of the 'Lok Sabha'?",
+    "answer_index": 1,
+    "options": [
+      "21 वर्ष",
+      "25 वर्ष",
+      "30 वर्ष",
+      "35 वर्ष"
+    ],
+    "question": "'लोकसभा' का सदस्य चुने जाने के लिए न्यूनतम आयु क्या होनी चाहिए?"
+  },
+  {
+    "subject": "General",
+    "question_hi": "संविधान के किस भाग में 'आपातकालीन उपबंध' (Emergency Provisions) दिए गए हैं?",
+    "question_en": "In which part of the Constitution are 'Emergency Provisions' given?",
+    "answer_index": 2,
+    "options": [
+      "भाग-XV",
+      "भाग-XVII",
+      "भाग-XVIII",
+      "भाग-XX"
+    ],
+    "question": "संविधान के किस भाग में 'आपातकालीन उपबंध' (Emergency Provisions) दिए गए हैं?"
   }
 ]
