@@ -1,6 +1,6 @@
 {
   "auto_enabled": true,
   "current_index": 0,
-  "any_q_auto": true,
+  "any_q_auto": false,
   "auto_test": true
 }
