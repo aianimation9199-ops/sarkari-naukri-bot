@@ -1,22 +1,13 @@
 """
-SARKARI NAUKRI ACADEMY — QUIZ BOT v9.0
-All 23 issues fixed:
-1.  Mixed questions, 10s per question in test
-2.  100 questions per test
-3.  Total test time = 100*10 = 1000s ≈ 16.67 min
-4.  Notifications: 8:50, 11:50, 14:50, 19:50 IST (10min before 9,12,15,20)
-5.  Any-questions = 1min/Q, no limit; paused 5min before test, resumes 15min after
-6.  Smart text paste — no format needed, auto-detect
-7.  Answer correctness fixed — proper answer_index validation
-8.  Group polls auto-delete 5min after sending (one by one)
-9.  Group: only admins can send messages (bot restricts others)  [Note: needs bot admin rights]
-10. Any-questions auto ON/OFF button
-11-18. Smart text paste — just paste raw text, bot extracts Q&A
-19. Question+options validated before sending
-20. Polls sent to GROUP (CHAT_ID), not bot DM
-21. Questions saved in GitHub; only group polls deleted after 5min
-22. "Any Questions" button — 1min/Q, no question limit
-23. Emojis added to make questions attractive
+SARKARI NAUKRI ACADEMY — QUIZ BOT v10.0
+New Features Added:
+1.  PDF Upload → Auto extract Q+Options+Answer (subject-wise) as polls
+2.  Paid PDF Catalog (subject-wise, ₹49 each) — shown in group via broadcast
+3.  Broadcast message to group from admin
+4.  PDF Purchase Request — user sends request, admin gets notification
+5.  Notice Board — admin can post/view notices
+6.  Smart PDF-to-Polls: extracts real MCQs with correct answers, sends as polls
+7.  Premium PDF store: Bihar Police all subjects
 """
 
 import os, json, time, asyncio, logging, random, re, base64
@@ -39,7 +30,7 @@ log = logging.getLogger(__name__)
 # ── Railway Variables ─────────────────────────────────────
 BOT_TOKEN    = os.environ.get("BOT_TOKEN", "")
 ADMIN_ID     = int(os.environ.get("ADMIN_ID", "0"))
-CHAT_ID      = os.environ.get("CHAT_ID", "")          # Telegram Group ID
+CHAT_ID      = os.environ.get("CHAT_ID", "")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 GIST_ID      = os.environ.get("GIST_ID", "")
 GROQ_KEY     = os.environ.get("GROQ_KEY", "")
@@ -49,32 +40,86 @@ GH_REPO   = "sarkari-naukri-bot"
 GH_BRANCH = "main"
 
 # ── Timing constants ──────────────────────────────────────
-TEST_Q_TIME    = 10           # Fix1: 10 sec per question in TEST
-ANY_Q_TIME     = 60           # Fix22: 1 min per question in any-questions mode
-TOTAL_Q        = 100          # Fix2: 100 questions per test
-# Fix3: 100 * 10 = 1000 sec = 16.666... min
-TEST_TOTAL_SEC = TOTAL_Q * TEST_Q_TIME   # = 1000
+TEST_Q_TIME    = 10
+ANY_Q_TIME     = 60
+TOTAL_Q        = 100
+TEST_TOTAL_SEC = TOTAL_Q * TEST_Q_TIME
 
-# Fix4: notification 10 min before each auto-test
-# Tests at 9,12,15,20 → notify at 8:50, 11:50, 14:50, 19:50
-AUTO_TEST_H  = [9, 12, 15, 20]       # test start hours IST
-AUTO_NOTIF   = [(8,50),(11,50),(14,50),(19,50)]  # notification times IST
+AUTO_TEST_H  = [9, 12, 15, 20]
+AUTO_NOTIF   = [(8,50),(11,50),(14,50),(19,50)]
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
-POLL_DELETE_DELAY = 5 * 60    # Fix8: delete group polls after 5 min
-PAUSE_BEFORE_TEST = 5 * 60    # Fix5: pause any-questions 5 min before test
-RESUME_AFTER_TEST = 15 * 60   # Fix5: resume any-questions 15 min after test
+POLL_DELETE_DELAY = 5 * 60
+PAUSE_BEFORE_TEST = 5 * 60
+RESUME_AFTER_TEST = 15 * 60
 
-Q_FILE   = "quiz_data.json"
-S_FILE   = "scores.json"
-CFG_FILE = "bot_config.json"
+Q_FILE      = "quiz_data.json"
+S_FILE      = "scores.json"
+CFG_FILE    = "bot_config.json"
+NOTICE_FILE = "notices.json"
+REQ_FILE    = "pdf_requests.json"
 
 _cache: dict = {}
 
-# Question emojis for variety — Fix23
 Q_EMOJIS = ["🎯","📚","🧠","💡","🔥","⚡","🌟","🎓","📖","🏆",
              "🎪","🎭","🎨","🧩","🔮","🌈","🎲","🏅","🎤","💫"]
+
+# ════════════════════════════════════════════════════════
+# PAID PDF CATALOG
+# ════════════════════════════════════════════════════════
+PDF_CATALOG = [
+    # (id, subject, name, price)
+    ("pol_obj",  "Indian Polity",   "📜 Indian Polity Objective 2026",       49),
+    ("chem_obj", "Chemistry",       "⚗️ Chemistry Objective (New)",           49),
+    ("chem_sub", "Chemistry",       "⚗️ Chemistry Subjective (New)",          49),
+    ("chem_all", "Chemistry",       "⚗️ Chemistry Full Notes",                49),
+    ("ca_2026",  "Current Affairs", "📰 Current Affairs 2026",               49),
+    ("bio_obj",  "Biology",         "🧬 Biology Objective (New)",             49),
+    ("bio_sub",  "Biology",         "🧬 Biology Subjective (New)",            49),
+    ("bio_all",  "Biology",         "🧬 Biology Full Notes",                  49),
+    ("geo_obj",  "Geography",       "🌍 Indian Geography 2026 Objective",     49),
+    ("geo_sub",  "Geography",       "🌍 Indian Geography 2026 Subjective",    49),
+    ("geo_all",  "Geography",       "🌍 Indian Geography Full Notes",         49),
+    ("hist_obj", "History",         "🏛️ Indian History Objective",            49),
+    ("hist_sub", "History",         "🏛️ Indian History Subjective",           49),
+    ("math_obj", "Mathematics",     "🔢 Mathematics Objective",               49),
+    ("sci_obj",  "Science",         "🔬 General Science Objective",           49),
+    ("eco_obj",  "Economy",         "💰 Indian Economy Objective",            49),
+    ("bpol_all", "Bihar Police",    "👮 Bihar Police — All Subjects Bundle",  199),
+    ("bpol_gk",  "Bihar Police",    "👮 Bihar Police GK Full Notes",          49),
+    ("bpol_ca",  "Bihar Police",    "👮 Bihar Police Current Affairs",        49),
+    ("eng_obj",  "English",         "🅰️ English Grammar Objective",           49),
+    ("hindi_obj","Hindi",           "🔤 Hindi Vyakaran Objective",            49),
+    ("comp_obj", "Computer",        "💻 Computer Awareness Objective",        49),
+]
+
+def pdf_catalog_text():
+    lines = [
+        "📚 *PREMIUM PDF STORE* 📚",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        "🎯 *Bihar Police | SSC | Railway | UPSC*",
+        "",
+        "📦 *AVAILABLE PDFs:*",
+        ""
+    ]
+    subj_done = set()
+    for pid, subj, name, price in PDF_CATALOG:
+        if subj not in subj_done:
+            lines.append(f"\n*── {subj} ──*")
+            subj_done.add(subj)
+        lines.append(f"  • {name} — *₹{price}*")
+    lines += [
+        "",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        "💳 *Khareedne ke liye:*",
+        "Group mein likho: `purchase <PDF name>`",
+        "Ya bot mein: /buypdf",
+        "",
+        "📞 Admin se contact: @admin",
+        "✅ Payment ke baad PDF turant milega!",
+    ]
+    return "\n".join(lines)
 
 # ════════════════════════════════════════════════════════
 # GITHUB STORAGE
@@ -156,6 +201,18 @@ def load_cfg():
 
 def save_cfg(c): gh_write(CFG_FILE, c, "cfg")
 
+def load_notices():
+    d = gh_read(NOTICE_FILE)
+    return d if isinstance(d, list) else []
+
+def save_notices(n): gh_write(NOTICE_FILE, n, "notices")
+
+def load_requests():
+    d = gh_read(REQ_FILE)
+    return d if isinstance(d, list) else []
+
+def save_requests(r): gh_write(REQ_FILE, r, "requests")
+
 def subjects(qs): return sorted({q.get("subject","General") for q in qs})
 
 def pick(qs, mode, n):
@@ -165,7 +222,6 @@ def pick(qs, mode, n):
 def ft(s): return f"{int(s)//60}m {int(s)%60}s"
 def now_ist(): return datetime.now(IST)
 
-# Fix23: Add emoji to question text
 def qtxt(q, i, total):
     emoji = Q_EMOJIS[i % len(Q_EMOJIS)]
     hi = q.get("question_hi") or q.get("question","")
@@ -176,16 +232,13 @@ def qtxt(q, i, total):
         body = hi or en or "?"
     return (f"{emoji} Q{i+1}/{total}\n" + body)[:300]
 
-# Fix19: Validate options — ensure each option is non-empty string
 def qopts(q):
     raw = q.get("options", [])
     opts = [str(o).strip()[:100] for o in raw if str(o).strip()]
-    # Need at least 2 options
     while len(opts) < 2:
         opts.append(f"Option {len(opts)+1}")
     return opts[:10]
 
-# Fix7: Validate answer_index strictly
 def qans(q, opts):
     idx = q.get("answer_index", 0)
     try: idx = int(idx)
@@ -208,7 +261,7 @@ def lb_txt(scores, top=20):
     return "\n".join(lines)
 
 # ════════════════════════════════════════════════════════
-# KEYBOARDS — Fix22: "Any Questions" button added
+# KEYBOARDS
 # ════════════════════════════════════════════════════════
 def main_kb():
     return InlineKeyboardMarkup([
@@ -224,49 +277,34 @@ def main_kb():
          InlineKeyboardButton("🕐 Auto Test ON/OFF",  callback_data="toggle_auto")],
         [InlineKeyboardButton("🏆 Leaderboard",       callback_data="lb"),
          InlineKeyboardButton("📊 My Score",          callback_data="me")],
-        [InlineKeyboardButton("📈 Status",            callback_data="stat"),
-         InlineKeyboardButton("🔧 GitHub Check",      callback_data="gh_check")],
+        [InlineKeyboardButton("📢 Broadcast",         callback_data="broadcast"),
+         InlineKeyboardButton("📌 Notice Board",      callback_data="notices")],
+        [InlineKeyboardButton("📦 PDF Requests",      callback_data="view_requests"),
+         InlineKeyboardButton("📈 Status",            callback_data="stat")],
+        [InlineKeyboardButton("🔧 GitHub Check",      callback_data="gh_check")],
     ])
 
 # ════════════════════════════════════════════════════════
-# SMART TEXT PARSER — Fix6,11-18: Just paste any text, auto-extract
+# SMART TEXT PARSER
 # ════════════════════════════════════════════════════════
 def smart_parse(text: str) -> list:
-    """
-    Accepts text in ANY of these formats and auto-detects:
-    1. Structured: SUBJECT/QH/QE/A/B/C/D/ANS
-    2. Simple: Q: ... A: ... B: ... C: ... D: ... ANS: ...
-    3. Numbered: 1. Question? (a) opt1 (b) opt2 ... Ans: a
-    4. Raw paste from books/PDFs
-    """
     result = []
-    am = {"A":0,"B":1,"C":2,"D":3,"a":0,"b":1,"c":2,"d":3,
-          "1":0,"2":1,"3":2,"4":3}
-
-    # Try structured format first (SUBJECT/QH/QE/ANS)
     if re.search(r'(?:QH:|QE:|SUBJECT:|ANS:)', text, re.I):
         result = _parse_structured(text)
         if result: return result
-
-    # Try numbered MCQ format
     result = _parse_numbered(text)
     if result: return result
-
-    # Try simple Q:/A:/B:/C:/D: format
     result = _parse_simple(text)
     return result
 
 def _parse_structured(text: str) -> list:
-    """SUBJECT/QH/QE/A/B/C/D/ANS format, --- optional"""
     result = []; am = {"A":0,"B":1,"C":2,"D":3}
-    # Split on --- or blank line before SUBJECT/QH
     if "---" in text:
         blocks = text.strip().split("---")
     else:
         blocks = re.split(r'\n\s*\n(?=(?:SUBJECT|QH|QE|Q):)', text.strip(), flags=re.I)
         if len(blocks)==1:
             blocks = re.split(r'(?=SUBJECT:)', text.strip(), flags=re.I)
-
     for block in blocks:
         block = block.strip()
         if not block: continue
@@ -290,10 +328,8 @@ def _parse_structured(text: str) -> list:
     return result
 
 def _parse_numbered(text: str) -> list:
-    """1. Question? (a) opt (b) opt ... Ans: a"""
     result = []
     am = {"a":0,"b":1,"c":2,"d":3,"1":0,"2":1,"3":2,"4":3}
-    # Split on question numbers
     blocks = re.split(r'(?:^|\n)\s*\d+[\.\)]\s+', text.strip())
     for block in blocks:
         block = block.strip()
@@ -302,11 +338,9 @@ def _parse_numbered(text: str) -> list:
         if not lines: continue
         qt = lines[0]; opts = []; ans_idx = 0
         for line in lines[1:]:
-            # Options: (a) ... or a) ... or A. ...
             m = re.match(r'^[\(\[]?([A-Da-d1-4])[\)\]\.]\s*(.+)', line)
             if m: opts.append(m.group(2).strip()[:100])
-            # Answer
-            a = re.search(r'(?:ans(?:wer)?|correct)\s*[:–-]\s*([A-Da-d1-4])', line, re.I)
+            a = re.search(r'(?:ans(?:wer)?|correct|sahi)\s*[:–-]\s*([A-Da-d1-4])', line, re.I)
             if a: ans_idx = am.get(a.group(1).lower(), 0)
         if qt and len(opts)>=2:
             result.append({
@@ -315,7 +349,6 @@ def _parse_numbered(text: str) -> list:
     return result
 
 def _parse_simple(text: str) -> list:
-    """Q: ... A: ... B: ... C: ... D: ... ANS: ..."""
     result = []
     am = {"A":0,"B":1,"C":2,"D":3}
     blocks = re.split(r'\n\s*\n', text.strip())
@@ -337,35 +370,91 @@ def _parse_simple(text: str) -> list:
     return result
 
 # ════════════════════════════════════════════════════════
+# PDF TEXT EXTRACTION — improved with pdfplumber fallback
+# ════════════════════════════════════════════════════════
+def pdf_to_text(b: bytes) -> str:
+    """Try multiple methods to extract text from PDF"""
+    # Method 1: Try pypdf2/pypdf
+    try:
+        import io
+        try:
+            from pypdf import PdfReader
+        except ImportError:
+            from PyPDF2 import PdfReader
+        reader = PdfReader(io.BytesIO(b))
+        pages = []
+        for page in reader.pages:
+            try:
+                t = page.extract_text()
+                if t: pages.append(t)
+            except Exception: pass
+        text = "\n".join(pages)
+        if len(text.strip()) > 100:
+            return text[:20000]
+    except Exception as e:
+        log.warning("pypdf failed: %s", e)
+
+    # Method 2: Raw binary scan for text content
+    try:
+        t = b.decode("latin-1", errors="ignore")
+        # Extract text between parentheses (PDF text stream format)
+        chunks = re.findall(r'\(((?:[^()\\]|\\.)*)\)', t)
+        cleaned = []
+        for chunk in chunks:
+            chunk = chunk.replace('\\n', '\n').replace('\\r', '\n')
+            chunk = chunk.replace('\\t', ' ').replace('\\\\', '\\')
+            chunk = re.sub(r'\\[0-7]{1,3}', '', chunk)
+            if len(chunk) > 2:
+                cleaned.append(chunk)
+        result = re.sub(r'\s+', ' ', ' '.join(cleaned))
+        if len(result.strip()) > 50:
+            return result[:20000]
+    except Exception as e:
+        log.warning("raw pdf scan failed: %s", e)
+
+    return ""
+
+# ════════════════════════════════════════════════════════
 # GROQ AI
 # ════════════════════════════════════════════════════════
 def groq_gen(subject: str, count: int = 10) -> list:
     if not GROQ_KEY: return []
     prompt = (
-        f'Generate {count} MCQ for "{subject}" for SSC/Railway/UPSC.\n'
+        f'Generate {count} MCQ for "{subject}" for SSC/Railway/UPSC/Bihar Police.\n'
         'Return ONLY valid JSON array:\n'
         '[{"question_hi":"हिंदी प्रश्न?","question_en":"English question?",'
         '"options":["हिंदी A / English A","हिंदी B / English B",'
         '"हिंदी C / English C","हिंदी D / English D"],'
         f'"answer_index":0,"subject":"{subject}"}}]\n'
-        'IMPORTANT: answer_index must be 0-3 (0=first option is correct). Verify facts.'
+        'IMPORTANT: answer_index must be 0-3. Verify every answer is factually correct.'
     )
     return _groq_call(prompt, 4000)
 
-def groq_from_pdf(content: str, count: int = 20) -> list:
+def groq_from_pdf(content: str, count: int = 30, subject: str = "General") -> list:
+    """
+    Send PDF text to Groq and get MCQ with verified correct answers.
+    Extracts existing MCQs if present, otherwise generates from content.
+    """
     if not GROQ_KEY: return []
-    snippet = content[:8000]
+    snippet = content[:10000]
     prompt = (
-        f"Generate {count} MCQ from this study material for Indian Govt exams.\n\n"
+        f"You are an expert MCQ extractor for Indian government exams.\n"
+        f"Subject: {subject}\n\n"
+        f"TASK: Extract or generate {count} MCQ from this study material.\n"
+        f"If the material already has questions with options, extract them EXACTLY.\n"
+        f"If no questions, generate MCQs from the content.\n\n"
         f"MATERIAL:\n{snippet}\n\n"
-        'Return ONLY valid JSON array:\n'
+        f"RULES:\n"
+        f"1. answer_index: 0=first option correct, 1=second, 2=third, 3=fourth\n"
+        f"2. Every answer MUST be factually verified and correct\n"
+        f"3. Options must be distinct and non-overlapping\n"
+        f"4. Subject should be detected from content\n\n"
+        'Return ONLY valid JSON array, no other text:\n'
         '[{"question_hi":"हिंदी प्रश्न?","question_en":"English question?",'
-        '"options":["हिंदी A / English A","हिंदी B / English B",'
-        '"हिंदी C / English C","हिंदी D / English D"],'
-        '"answer_index":0,"subject":"General"}]\n'
-        'IMPORTANT: answer_index 0-3. answer_index=0 means FIRST option is correct.'
+        '"options":["Option A","Option B","Option C","Option D"],'
+        f'"answer_index":0,"subject":"{subject}"}}]'
     )
-    return _groq_call(prompt, 6000)
+    return _groq_call(prompt, 8000)
 
 def _groq_call(prompt, max_tok):
     try:
@@ -373,13 +462,12 @@ def _groq_call(prompt, max_tok):
             headers={"Authorization":f"Bearer {GROQ_KEY}","Content-Type":"application/json"},
             json={"model":"llama3-8b-8192",
                   "messages":[{"role":"user","content":prompt}],
-                  "temperature":0.4,"max_tokens":max_tok}, timeout=60)
+                  "temperature":0.3,"max_tokens":max_tok}, timeout=90)
         r.raise_for_status()
         txt = r.json()["choices"][0]["message"]["content"]
         m = re.search(r"\[.*\]", txt, re.DOTALL)
         if m:
             qs = json.loads(m.group())
-            # Fix7: validate each question
             valid = []
             for q in qs:
                 opts = [str(o).strip() for o in q.get("options",[]) if str(o).strip()]
@@ -396,26 +484,19 @@ def _groq_call(prompt, max_tok):
         log.error("groq: %s", e)
     return []
 
-def pdf_to_text(b: bytes) -> str:
-    try:
-        t = b.decode("latin-1", errors="ignore")
-        chunks = re.findall(r'\((.*?)\)', t)
-        return re.sub(r'\s+',' ', re.sub(r'\\[nrt]',' '," ".join(chunks)))[:15000]
-    except Exception: return ""
-
 # ════════════════════════════════════════════════════════
 # STATE
 # ════════════════════════════════════════════════════════
-sess: dict = {}           # test sessions
-any_q_sess: dict = {}     # any-questions sessions
-any_q_paused = False      # Fix5: paused during test
+sess: dict = {}
+any_q_sess: dict = {}
+any_q_paused = False
 
 # ════════════════════════════════════════════════════════
 # COMMANDS
 # ════════════════════════════════════════════════════════
 async def c_start(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await u.message.reply_text(
-        "🎓 *Sarkari Naukri Academy Quiz Bot v9.0*\n\n"
+        "🎓 *Sarkari Naukri Academy Quiz Bot v10.0*\n\n"
         "🎯 100 Questions | ⏱ ~16.7 Minutes\n"
         "⚡ Test: 10 sec/Q | ❓ Any Q: 60 sec/Q\n"
         "✅ Sahi = green | ❌ Galat = red\n"
@@ -435,7 +516,7 @@ async def c_status(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
     aq="✅ ON" if cfg.get("any_q_auto",True) else "❌ OFF"
     ap="⏸ PAUSED" if any_q_paused else "▶️ Active"
     await u.message.reply_text(
-        f"📊 *Bot Status v9.0*\n━━━━━━━━━━━━━━━\n"
+        f"📊 *Bot Status v10.0*\n━━━━━━━━━━━━━━━\n"
         f"❓`{len(qs)}` Qs | 👥`{len(sc)}` Users\n"
         f"🔴 Test Active:`{len(sess)}`\n"
         f"🕐 Auto Test: {at} | Any Q Auto: {aq}\n"
@@ -480,6 +561,75 @@ async def c_ghcheck(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
     ok,msg=gh_ok()
     await u.message.reply_text(f"🔧 *GitHub*\n{msg}"+("" if ok else
         "\nFix: github.com/settings/tokens → repo scope → Railway update"),
+        parse_mode="Markdown")
+
+# /buypdf — user sends PDF purchase request
+async def c_buypdf(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    user = u.effective_user
+    lines = [
+        "📦 *PREMIUM PDF CATALOG*",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        ""
+    ]
+    subj_done = set()
+    for pid, subj, name, price in PDF_CATALOG:
+        if subj not in subj_done:
+            lines.append(f"\n*{subj}:*")
+            subj_done.add(subj)
+        lines.append(f"  • {name} — ₹{price}")
+    lines += [
+        "",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        "📩 *Kharidne ke liye:*",
+        "Yahan likhein: `purchase <PDF naam>`",
+        "Example: `purchase Chemistry Objective`",
+        "",
+        "Admin confirm karega aur PDF bhejega! ✅"
+    ]
+    await u.message.reply_text("\n".join(lines), parse_mode="Markdown")
+
+# /notices — view notice board
+async def c_notices(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    notices = load_notices()
+    if not notices:
+        await u.message.reply_text("📌 Abhi koi notice nahi hai.")
+        return
+    lines = ["📌 *NOTICE BOARD* 📌", "━━━━━━━━━━━━━━━━━━━━━━", ""]
+    for i, n in enumerate(notices[-10:], 1):  # last 10 notices
+        lines.append(f"*{i}.* {n['text']}")
+        lines.append(f"   _— {n.get('date','')}_ \n")
+    await u.message.reply_text("\n".join(lines), parse_mode="Markdown")
+
+# /addnotice — admin adds a notice
+async def c_addnotice(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if u.effective_user.id != ADMIN_ID:
+        await u.message.reply_text("❌ Sirf admin."); return
+    ctx.user_data["add_notice"] = True
+    await u.message.reply_text("📌 Notice likhein (jo group mein dikhana hai):")
+
+# /broadcast — admin broadcasts message to group
+async def c_broadcast(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if u.effective_user.id != ADMIN_ID:
+        await u.message.reply_text("❌ Sirf admin."); return
+    ctx.user_data["broadcast"] = True
+    await u.message.reply_text(
+        "📢 *Broadcast Message*\n\n"
+        "Jo message group mein bhejana hai woh likhein:\n"
+        "_(PDF catalog bhejne ke liye 'catalog' likhein)_",
+        parse_mode="Markdown")
+
+# /pdfpoll — send extracted questions from PDF as polls to group
+async def c_pdfpoll(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if u.effective_user.id != ADMIN_ID:
+        await u.message.reply_text("❌ Sirf admin."); return
+    ctx.user_data["pdf_poll_mode"] = True
+    await u.message.reply_text(
+        "📊 *PDF → Polls Mode*\n\n"
+        "PDF bhejo — main automatically:\n"
+        "1. Saare MCQ extract karunga\n"
+        "2. Subject by subject polls group mein bheji\n"
+        "3. Sahi answer marked rahega\n\n"
+        "Ab PDF bhejo 👇",
         parse_mode="Markdown")
 
 # ════════════════════════════════════════════════════════
@@ -545,18 +695,16 @@ async def on_cb(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
         else:
             await q.message.reply_text("Koi poll nahi chal raha.")
 
-    # Fix22: Any Questions button — 1min/Q, no limit
     elif d=="any_q_start":
         if user.id!=ADMIN_ID:
             await q.message.reply_text("❌ Sirf admin."); return
         if any_q_paused:
-            await q.message.reply_text("⏸ Any Questions abhi paused hai (test se 5min pehle ya test chal raha hai)."); return
+            await q.message.reply_text("⏸ Paused hai (test se pehle/baad)."); return
         if target in any_q_sess and any_q_sess[target].get("running"):
-            await q.message.reply_text("❓ Any Questions pehle se chal raha hai."); return
+            await q.message.reply_text("❓ Already chal raha hai."); return
         asyncio.create_task(run_any_questions(ctx.application, target))
-        await q.message.reply_text("❓ Any Questions shuru! 1 min/Q, koi limit nahi.")
+        await q.message.reply_text("❓ Any Questions shuru! 1 min/Q.")
 
-    # Fix10: Any Q Auto ON/OFF
     elif d=="toggle_any_q":
         if user.id!=ADMIN_ID:
             await q.message.reply_text("❌ Sirf admin."); return
@@ -575,17 +723,36 @@ async def on_cb(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if user.id!=ADMIN_ID:
             await q.message.reply_text("❌ Sirf admin."); return
         ctx.user_data["aq"]=True
-        await q.message.reply_text(
-            "📋 Koi bhi format mein paste karo — bot auto detect karega!\n\n"
-            "Supported: Structured/Simple/Numbered format.\n/addq se format dekho.\n\nAb paste karo 👇")
+        await q.message.reply_text("📋 Text paste karo — bot auto detect karega!\nAb paste karo 👇")
 
     elif d=="pdf_help":
         if user.id!=ADMIN_ID:
             await q.message.reply_text("❌ Sirf admin."); return
-        ctx.user_data["pdf_mode"]=True
+        # Show PDF options
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📚 PDF → Questions Save (Quiz bank)",
+                                  callback_data="pdf_save")],
+            [InlineKeyboardButton("📊 PDF → Polls in Group (Turant bhejo)",
+                                  callback_data="pdf_polls")],
+            [InlineKeyboardButton("🔙 Back", callback_data="back")],
+        ])
         await q.message.reply_text(
-            "📄 *PDF Upload karo*\nAI automatically MCQ banayega!\nAb PDF bhejo 👇",
-            parse_mode="Markdown")
+            "📄 *PDF Upload — kya karna hai?*",
+            reply_markup=kb, parse_mode="Markdown")
+
+    elif d=="pdf_save":
+        if user.id!=ADMIN_ID:
+            await q.message.reply_text("❌ Sirf admin."); return
+        ctx.user_data["pdf_mode"]="save"
+        await q.message.reply_text("📄 PDF bhejo — main questions extract karke quiz bank mein save karunga 💾")
+
+    elif d=="pdf_polls":
+        if user.id!=ADMIN_ID:
+            await q.message.reply_text("❌ Sirf admin."); return
+        ctx.user_data["pdf_mode"]="polls"
+        await q.message.reply_text(
+            "📊 PDF bhejo — main questions nikal ke group mein polls bheji!\n"
+            "Subject detect hoga automatically. Sahi answer tick hoga ✅")
 
     elif d=="ai_gen":
         if user.id!=ADMIN_ID:
@@ -593,6 +760,68 @@ async def on_cb(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
         ctx.user_data["ai"]=True
         await q.message.reply_text("🤖 Subject likho:\n_Example: History, Science_",
             parse_mode="Markdown")
+
+    elif d=="broadcast":
+        if user.id!=ADMIN_ID:
+            await q.message.reply_text("❌ Sirf admin."); return
+        ctx.user_data["broadcast"]=True
+        await q.message.reply_text(
+            "📢 Message likhein jo group mein bhejna hai:\n"
+            "_(Catalog bhejne ke liye 'catalog' likhein)_")
+
+    elif d=="notices":
+        notices = load_notices()
+        if not notices:
+            await q.message.reply_text("📌 Koi notice nahi hai abhi.")
+            return
+        lines = ["📌 *NOTICE BOARD* 📌", "━━━━━━━━━━━━━━━━━━━━━━", ""]
+        for i, n in enumerate(notices[-10:], 1):
+            lines.append(f"*{i}.* {n['text']}")
+            lines.append(f"   _— {n.get('date','')}_ \n")
+        kb = None
+        if user.id == ADMIN_ID:
+            kb = InlineKeyboardMarkup([[
+                InlineKeyboardButton("➕ Notice Add", callback_data="add_notice"),
+                InlineKeyboardButton("🗑 Clear All",  callback_data="clear_notices"),
+            ]])
+        await q.message.reply_text("\n".join(lines), parse_mode="Markdown", reply_markup=kb)
+
+    elif d=="add_notice":
+        if user.id!=ADMIN_ID:
+            await q.message.reply_text("❌ Sirf admin."); return
+        ctx.user_data["add_notice"]=True
+        await q.message.reply_text("📌 Notice likhein:")
+
+    elif d=="clear_notices":
+        if user.id!=ADMIN_ID:
+            await q.message.reply_text("❌ Sirf admin."); return
+        save_notices([])
+        await q.message.reply_text("🗑 Saare notices delete ho gaye.")
+
+    elif d=="view_requests":
+        if user.id!=ADMIN_ID:
+            await q.message.reply_text("❌ Sirf admin."); return
+        reqs = load_requests()
+        if not reqs:
+            await q.message.reply_text("📦 Koi pending request nahi hai.")
+            return
+        lines = ["📦 *PDF PURCHASE REQUESTS*", "━━━━━━━━━━━━━━━━━━━━━━", ""]
+        for i, r in enumerate(reqs[-20:], 1):
+            lines.append(
+                f"*{i}.* 👤 {r.get('name','?')} (ID: `{r.get('uid','?')}`)\n"
+                f"   📄 {r.get('pdf','?')}\n"
+                f"   🕐 {r.get('date','?')}\n"
+                f"   Status: {r.get('status','⏳ Pending')}\n")
+        kb = InlineKeyboardMarkup([[
+            InlineKeyboardButton("🗑 Clear Requests", callback_data="clear_requests")
+        ]])
+        await q.message.reply_text("\n".join(lines), parse_mode="Markdown", reply_markup=kb)
+
+    elif d=="clear_requests":
+        if user.id!=ADMIN_ID:
+            await q.message.reply_text("❌ Sirf admin."); return
+        save_requests([])
+        await q.message.reply_text("🗑 Saari requests clear ho gayi.")
 
     elif d=="back":
         await q.message.reply_text("👇", reply_markup=main_kb())
@@ -603,6 +832,7 @@ async def on_cb(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def on_msg(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user=u.effective_user; text=(u.message.text or "").strip()
 
+    # Admin: AI questions
     if user.id==ADMIN_ID and ctx.user_data.get("ai"):
         ctx.user_data.pop("ai")
         await u.message.reply_text(f"🤖 *{text}* questions bana raha hoon...", parse_mode="Markdown")
@@ -616,12 +846,12 @@ async def on_msg(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
             else f"⚠️ Parsed but save fail!\n{err}")
         return
 
+    # Admin: Text paste
     if user.id==ADMIN_ID and ctx.user_data.get("aq"):
         ctx.user_data.pop("aq")
         parsed=smart_parse(text)
         if not parsed:
-            await u.message.reply_text(
-                "❌ Parse fail.\n/addq se format dekho."); return
+            await u.message.reply_text("❌ Parse fail.\n/addq se format dekho."); return
         aq=load_qs(); aq.extend(parsed)
         ok,err=gh_write(Q_FILE, aq, f"Manual:{len(parsed)}")
         await u.message.reply_text(
@@ -630,9 +860,83 @@ async def on_msg(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown")
         return
 
+    # Admin: Broadcast message
+    if user.id==ADMIN_ID and ctx.user_data.get("broadcast"):
+        ctx.user_data.pop("broadcast")
+        if not CHAT_ID:
+            await u.message.reply_text("❌ CHAT_ID set nahi hai."); return
+        try:
+            if text.lower()=="catalog":
+                msg_text = pdf_catalog_text()
+            else:
+                msg_text = f"📢 *ANNOUNCEMENT*\n━━━━━━━━━━━━━━━━━━━━━━\n\n{text}\n\n━━━━━━━━━━━━━━━━━━━━━━\n_— Sarkari Naukri Academy_"
+            await ctx.bot.send_message(int(CHAT_ID), msg_text, parse_mode="Markdown")
+            await u.message.reply_text("✅ Broadcast bhej diya group mein!")
+        except Exception as e:
+            await u.message.reply_text(f"❌ Broadcast fail: {e}")
+        return
+
+    # Admin: Add notice
+    if user.id==ADMIN_ID and ctx.user_data.get("add_notice"):
+        ctx.user_data.pop("add_notice")
+        notices = load_notices()
+        notices.append({
+            "text": text,
+            "date": now_ist().strftime("%d %b %Y, %I:%M %p IST"),
+            "by": user.full_name
+        })
+        save_notices(notices)
+        await u.message.reply_text("✅ Notice save ho gaya!")
+        # Also post to group
+        if CHAT_ID:
+            try:
+                await ctx.bot.send_message(int(CHAT_ID),
+                    f"📌 *NOTICE*\n━━━━━━━━━━━━━━━━━━━━━━\n\n{text}\n\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━\n_— Sarkari Naukri Academy_",
+                    parse_mode="Markdown")
+            except Exception as e:
+                log.error("notice group: %s", e)
+        return
+
+    # User: PDF purchase request
+    if text.lower().startswith("purchase ") or text.lower().startswith("buy "):
+        pdf_name = text.split(" ", 1)[1].strip() if " " in text else "Unknown"
+        reqs = load_requests()
+        reqs.append({
+            "uid": str(user.id),
+            "name": user.full_name,
+            "pdf": pdf_name,
+            "date": now_ist().strftime("%d %b %Y, %I:%M %p IST"),
+            "status": "⏳ Pending"
+        })
+        save_requests(reqs)
+        await u.message.reply_text(
+            f"✅ *Request Received!*\n\n"
+            f"📄 PDF: *{pdf_name}*\n"
+            f"💳 Price: ₹49\n\n"
+            f"Admin ko notification mil gayi.\n"
+            f"Payment details ke liye admin se contact karein.\n"
+            f"📞 _Payment ke baad turant PDF milega!_",
+            parse_mode="Markdown")
+        # Notify admin
+        if ADMIN_ID:
+            try:
+                await ctx.bot.send_message(ADMIN_ID,
+                    f"🔔 *NEW PDF REQUEST!*\n\n"
+                    f"👤 {user.full_name} (ID: `{user.id}`)\n"
+                    f"📄 PDF: *{pdf_name}*\n"
+                    f"🕐 {now_ist().strftime('%d %b %Y, %I:%M %p IST')}\n\n"
+                    f"Bot → PDF Requests mein dekho.",
+                    parse_mode="Markdown")
+            except Exception as e:
+                log.error("admin notify: %s", e)
+        return
+
     await u.message.reply_text("👇", reply_markup=main_kb())
 
-# ── PDF handler ──────────────────────────────────────────
+# ════════════════════════════════════════════════════════
+# PDF HANDLER — Save mode + Polls mode
+# ════════════════════════════════════════════════════════
 async def on_document(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user=u.effective_user
     if user.id!=ADMIN_ID:
@@ -642,70 +946,127 @@ async def on_document(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
     fname=(doc.file_name or "").lower()
     if not (fname.endswith(".pdf") or fname.endswith(".txt")):
         await u.message.reply_text("⚠️ Sirf PDF ya TXT bhejo."); return
-    await u.message.reply_text("📄 AI process kar raha hai...", parse_mode="Markdown")
+
+    pdf_mode = ctx.user_data.pop("pdf_mode", "save")
+    pdf_poll_mode = ctx.user_data.pop("pdf_poll_mode", False)
+    if pdf_poll_mode: pdf_mode = "polls"
+
+    await u.message.reply_text("📄 PDF process ho rahi hai...", parse_mode="Markdown")
     try:
         tf=await ctx.bot.get_file(doc.file_id)
         fb=bytes(await tf.download_as_bytearray())
         text=fb.decode("utf-8",errors="ignore") if fname.endswith(".txt") else pdf_to_text(fb)
         if not text.strip():
-            await u.message.reply_text("❌ Text extract nahi hua."); return
-        await u.message.reply_text("🤖 AI content analyze kar raha hai...")
-        parsed=groq_from_pdf(text, 20)
-        if not parsed: parsed=smart_parse(text)
+            await u.message.reply_text("❌ Text extract nahi hua. PDF scanned hogi ya protected hai."); return
+
+        await u.message.reply_text("🤖 AI questions extract kar raha hai...")
+
+        # Detect subject from filename
+        subj = "General"
+        fname_lower = fname.replace("_", " ").replace("-", " ")
+        subj_map = {
+            "chemistry": "Chemistry", "bio": "Biology", "polity": "Indian Polity",
+            "history": "History", "geography": "Geography", "physics": "Physics",
+            "math": "Mathematics", "economy": "Economy", "english": "English",
+            "hindi": "Hindi", "computer": "Computer", "science": "Science",
+            "gk": "GK", "current": "Current Affairs", "bihar": "Bihar Police",
+            "ssc": "SSC", "railway": "Railway",
+        }
+        for kw, s in subj_map.items():
+            if kw in fname_lower:
+                subj = s; break
+
+        parsed = groq_from_pdf(text, 30, subj)
         if not parsed:
-            await u.message.reply_text("❌ Questions nahi bane. Text Paste use karo."); return
-        aq=load_qs(); aq.extend(parsed)
-        ok,err=gh_write(Q_FILE, aq, f"PDF:{len(parsed)}")
-        await u.message.reply_text(
-            f"✅ *{len(parsed)} questions add!*\nTotal:{len(aq)} 💾✅" if ok
-            else f"⚠️ {len(parsed)} parsed, save fail.\n{err}",
-            parse_mode="Markdown")
+            parsed = smart_parse(text)
+        if not parsed:
+            await u.message.reply_text("❌ Questions nahi bane. PDF mein MCQ format hona chahiye."); return
+
+        if pdf_mode == "polls":
+            # Send questions as polls to group
+            target = int(CHAT_ID) if CHAT_ID else u.effective_chat.id
+            await u.message.reply_text(
+                f"✅ *{len(parsed)} questions extract hue!*\n"
+                f"📊 Group mein polls bheji ja rahi hain...\n"
+                f"Subject: {subj}", parse_mode="Markdown")
+
+            # Group by subject
+            subj_qs: dict = {}
+            for q in parsed:
+                s = q.get("subject", subj)
+                subj_qs.setdefault(s, []).append(q)
+
+            total_sent = 0
+            for s, qs in subj_qs.items():
+                # Send subject header
+                try:
+                    await ctx.bot.send_message(target,
+                        f"📚 *{s} — {len(qs)} Questions*\n"
+                        f"⏱ 60 sec/Q | ✅ = Sahi Answer",
+                        parse_mode="Markdown")
+                except Exception: pass
+                await asyncio.sleep(1)
+
+                for i, q in enumerate(qs):
+                    opts = qopts(q)
+                    ans  = qans(q, opts)
+                    txt  = qtxt(q, i, len(qs))
+                    try:
+                        msg = await ctx.bot.send_poll(
+                            chat_id=target, question=txt, options=opts,
+                            type=Poll.QUIZ, correct_option_id=ans,
+                            is_anonymous=False,
+                            open_period=60)
+                        # Auto delete after 5 min
+                        asyncio.create_task(_del_msg(ctx.application, target, msg.message_id, POLL_DELETE_DELAY))
+                        total_sent += 1
+                    except Exception as e:
+                        log.error("PDF poll Q%d: %s", i+1, e)
+                    await asyncio.sleep(3)
+
+            await u.message.reply_text(f"✅ *{total_sent} polls group mein bhej diye!*", parse_mode="Markdown")
+
+        else:
+            # Save to quiz bank
+            aq=load_qs(); aq.extend(parsed)
+            ok,err=gh_write(Q_FILE, aq, f"PDF:{len(parsed)}")
+            await u.message.reply_text(
+                f"✅ *{len(parsed)} questions add!*\n"
+                f"Subject: {subj}\nTotal:{len(aq)} 💾✅" if ok
+                else f"⚠️ {len(parsed)} parsed, save fail.\n{err}",
+                parse_mode="Markdown")
+
     except Exception as e:
         log.error("PDF: %s", e)
         await u.message.reply_text(f"❌ Error: {str(e)[:150]}")
 
 # ════════════════════════════════════════════════════════
-# ANY QUESTIONS — Fix22: 1 min/Q, no limit, auto-pause during test
+# ANY QUESTIONS
 # ════════════════════════════════════════════════════════
 async def run_any_questions(app, chat_id: int):
-    """
-    Sends questions one by one, 1 min each, no limit.
-    Pauses 5 min before test, resumes 15 min after test ends.
-    Fix8: Each poll auto-deletes from group after 5 min.
-    """
     global any_q_paused
     if chat_id in any_q_sess and any_q_sess[chat_id].get("running"):
         return
     any_q_sess[chat_id] = {"running": True}
     qs = load_qs()
     if not qs:
-        log.warning("any_q: no questions")
-        return
+        log.warning("any_q: no questions"); return
     idx = 0
     while any_q_sess.get(chat_id, {}).get("running", False):
         if any_q_paused:
-            await asyncio.sleep(10)
-            continue
+            await asyncio.sleep(10); continue
         if chat_id in sess:
-            # Test running — pause
-            await asyncio.sleep(10)
-            continue
-        q = qs[idx % len(qs)]
-        idx += 1
-        opts = qopts(q)
-        ans  = qans(q, opts)
-        txt  = qtxt(q, idx-1, len(qs))
-        # Fix8: send poll and schedule delete after 5 min
+            await asyncio.sleep(10); continue
+        q = qs[idx % len(qs)]; idx += 1
+        opts = qopts(q); ans = qans(q, opts); txt = qtxt(q, idx-1, len(qs))
         try:
             msg = await app.bot.send_poll(
                 chat_id=chat_id, question=txt, options=opts,
                 type=Poll.QUIZ, correct_option_id=ans,
-                is_anonymous=False,
-                open_period=min(ANY_Q_TIME, 600))
+                is_anonymous=False, open_period=min(ANY_Q_TIME, 600))
             asyncio.create_task(_del_msg(app, chat_id, msg.message_id, POLL_DELETE_DELAY))
         except Exception as e:
             log.error("any_q poll: %s", e)
-        # Refresh questions list periodically
         if idx % 10 == 0:
             qs = load_qs() or qs
         await asyncio.sleep(ANY_Q_TIME)
@@ -725,9 +1086,7 @@ async def begin_test(ctx, chat_id: int, mode: str):
         except Exception: pass
         return False
 
-    # Fix5: Pause any-questions during test
     any_q_paused = True
-
     sess[chat_id]={
         "questions":sel, "poll_map":{}, "user_data":{},
         "start_time":time.time(), "mode":mode, "timer_task":None,
@@ -753,10 +1112,10 @@ async def begin_test(ctx, chat_id: int, mode: str):
     return True
 
 async def _auto_end(app, cid):
-    await asyncio.sleep(TEST_TOTAL_SEC + 30)  # small buffer
+    await asyncio.sleep(TEST_TOTAL_SEC + 30)
     if cid in sess:
         try: await app.bot.send_message(cid,
-            f"⏰ *Test khatam!* Result aa raha hai...", parse_mode="Markdown")
+            "⏰ *Test khatam!* Result aa raha hai...", parse_mode="Markdown")
         except Exception: pass
         await end_test(app, cid, forced=True)
 
@@ -765,20 +1124,16 @@ async def _send_test_polls(app, cid):
     s=sess[cid]; total=len(s["questions"])
     for i,q in enumerate(s["questions"]):
         if cid not in sess: return
-        # Fix19: validate before sending
         opts=qopts(q); ans=qans(q,opts)
         if len(opts) < 2:
-            log.warning("Q%d skipped: not enough options", i+1)
-            continue
+            log.warning("Q%d skipped: not enough options", i+1); continue
         txt=qtxt(q,i,total)
         try:
             msg=await app.bot.send_poll(
                 chat_id=cid, question=txt, options=opts,
                 type=Poll.QUIZ, correct_option_id=ans,
-                is_anonymous=False,
-                open_period=min(TEST_Q_TIME+2, 600))
+                is_anonymous=False, open_period=min(TEST_Q_TIME+2, 600))
             if cid in sess: sess[cid]["poll_map"][str(msg.poll.id)]=i
-            # Fix8: auto-delete test poll after 5 min
             asyncio.create_task(_del_msg(app, cid, msg.message_id, POLL_DELETE_DELAY))
         except Exception as e:
             log.error("Test Poll Q%d: %s", i+1, e)
@@ -793,9 +1148,8 @@ async def on_poll_ans(u: Update, ctx: ContextTypes.DEFAULT_TYPE):
     pa=u.poll_answer; pid=str(pa.poll_id); user=pa.user; uid=str(user.id)
     for cid,s in list(sess.items()):
         if pid not in s["poll_map"]: continue
-        qi=s["poll_map"][pid]
-        q=s["questions"][qi]
-        opts=qopts(q); correct=qans(q,opts)  # Fix7: use validated answer
+        qi=s["poll_map"][pid]; q=s["questions"][qi]
+        opts=qopts(q); correct=qans(q,opts)
         if uid not in s["user_data"]:
             s["user_data"][uid]={
                 "name":user.full_name,"correct":0,"wrong":0,
@@ -811,10 +1165,7 @@ async def end_test(app, cid, forced=False):
     if cid not in sess: return
     s=sess.pop(cid)
     if not forced and s.get("timer_task"): s["timer_task"].cancel()
-
-    # Fix5: Resume any-questions after 15 min
     asyncio.create_task(_resume_any_q_after(RESUME_AFTER_TEST))
-
     ud=s["user_data"]
     if not ud:
         try: await app.bot.send_message(cid, "📊 Kisi ne participate nahi kiya.")
@@ -829,7 +1180,7 @@ async def end_test(app, cid, forced=False):
     ranked=sorted(ud.items(), key=rank_key)
     medals={0:"🥇",1:"🥈",2:"🥉"}
     lines=[
-        f"🏁 *TEST RESULT* 🏁",
+        "🏁 *TEST RESULT* 🏁",
         f"📅 {now_ist().strftime('%d %b %Y, %I:%M %p IST')}",
         "━━━━━━━━━━━━━━━━━━━━━━\n"
     ]
@@ -850,7 +1201,6 @@ async def end_test(app, cid, forced=False):
         sent_ids.append(msg.message_id)
     except Exception as e: log.error("result: %s", e)
 
-    # Winner motivational message
     if ranked:
         wname=ranked[0][1]["name"]
         try:
@@ -867,7 +1217,6 @@ async def end_test(app, cid, forced=False):
     if sent_ids:
         asyncio.create_task(_del_msg_list(app, cid, sent_ids, 7200))
 
-    # Save scores
     scores=load_sc()
     for uid,d in ud.items():
         el=d["last_time"]-d["start_time"]; tot=d["correct"]+d["wrong"]
@@ -891,9 +1240,7 @@ async def _resume_any_q_after(delay):
     global any_q_paused
     await asyncio.sleep(delay)
     any_q_paused = False
-    log.info("Any-questions resumed after test")
 
-# Fix8: delete single message after delay
 async def _del_msg(app, cid, mid, delay):
     await asyncio.sleep(delay)
     try: await app.bot.delete_message(cid, mid)
@@ -906,16 +1253,15 @@ async def _del_msg_list(app, cid, mids, delay):
         except Exception: pass
 
 # ════════════════════════════════════════════════════════
-# AUTO SCHEDULER — Fix4: notifications at X:50
+# AUTO SCHEDULER
 # ════════════════════════════════════════════════════════
 async def scheduler(app):
     global any_q_paused
-    log.info("Scheduler v9 started")
+    log.info("Scheduler v10 started")
     fired = set()
     while True:
         try:
             now=now_ist()
-            # Fix4: notifications 10 min before test (at X:50)
             for (nh, nm) in AUTO_NOTIF:
                 k=(now.date(), nh, nm, "notif")
                 if now.hour==nh and now.minute==nm and k not in fired:
@@ -930,10 +1276,8 @@ async def scheduler(app):
                                 f"❓ {len(load_qs())} questions ready hain",
                                 parse_mode="Markdown")
                         except Exception as e: log.error("notif: %s", e)
-                    # Fix5: pause any-questions 5 min before test
                     any_q_paused = True
 
-            # Auto test at exact hour
             for h in AUTO_TEST_H:
                 k=(now.date(), h, "test")
                 if now.hour==h and now.minute==0 and k not in fired:
@@ -942,13 +1286,11 @@ async def scheduler(app):
                         fired.add(k)
                         target=int(CHAT_ID)
                         if target not in sess:
-                            log.info("Auto test at %s:00 IST", h)
                             asyncio.create_task(
                                 begin_test(
                                     type("C",(),{"bot":app.bot,"application":app})(),
                                     target, "mixed"))
 
-            # Auto any-questions when not in test
             if CHAT_ID:
                 target=int(CHAT_ID)
                 cfg=load_cfg()
@@ -958,7 +1300,6 @@ async def scheduler(app):
                     not (any_q_sess.get(target,{}).get("running"))):
                     asyncio.create_task(run_any_questions(app, target))
 
-            # Clean old fired keys
             today=now.date()
             fired={k for k in fired if isinstance(k,tuple) and k[0]==today}
 
@@ -975,7 +1316,7 @@ async def post_init(app: Application):
 def main():
     if not BOT_TOKEN:
         log.error("BOT_TOKEN not set!"); return
-    log.info("Starting Bot v9.0 (PTB 20.3)...")
+    log.info("Starting Bot v10.0 ...")
     app=Application.builder().token(BOT_TOKEN).post_init(post_init).build()
     app.add_handler(CommandHandler("start",       c_start))
     app.add_handler(CommandHandler("test",        c_start))
@@ -985,11 +1326,16 @@ def main():
     app.add_handler(CommandHandler("addq",        c_addq))
     app.add_handler(CommandHandler("myid",        c_myid))
     app.add_handler(CommandHandler("ghcheck",     c_ghcheck))
+    app.add_handler(CommandHandler("buypdf",      c_buypdf))
+    app.add_handler(CommandHandler("notices",     c_notices))
+    app.add_handler(CommandHandler("addnotice",   c_addnotice))
+    app.add_handler(CommandHandler("broadcast",   c_broadcast))
+    app.add_handler(CommandHandler("pdfpoll",     c_pdfpoll))
     app.add_handler(CallbackQueryHandler(on_cb))
     app.add_handler(PollAnswerHandler(on_poll_ans))
     app.add_handler(MessageHandler(filters.Document.ALL, on_document))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_msg))
-    log.info("Bot running!")
+    log.info("Bot v10.0 running!")
     app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
 if __name__ == "__main__":
