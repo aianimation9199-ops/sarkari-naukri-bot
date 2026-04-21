@@ -2385,5 +2385,174 @@
       "5 वर्ष"
     ],
     "question": "'केन्द्रीय अन्वेषण ब्यूरो' (CBI) के निदेशक का कार्यकाल न्यूनतम कितने वर्ष का होता है?"
+  },
+  {
+    "subject": "(भारतीय संविधान)",
+    "question_hi": "1773 के रेगुलेटिंग एक्ट के तहत बंगाल के प्रथम गवर्नर जनरल कौन बने थे?",
+    "question_en": "Who became the first Governor General of Bengal under the Regulating Act of 1773?",
+    "answer_index": 1,
+    "options": [
+      "लॉर्ड कैनिंग (Lord Canning)",
+      "वारेन हेस्टिंग्स (Warren Hastings)",
+      "लॉर्ड विलियम बैटिंग (Lord William Bentinck)",
+      "लॉर्ड डलहौजी (Lord Dalhousie)"
+    ],
+    "question": "1773 के रेगुलेटिंग एक्ट के तहत बंगाल के प्रथम गवर्नर जनरल कौन बने थे?"
+  },
+  {
+    "subject": "GK (भारतीय संविधान)",
+    "question_hi": "कलकत्ता में सुप्रीम कोर्ट की स्थापना किस वर्ष की गई थी?",
+    "question_en": "In which year was the Supreme Court established in Calcutta?",
+    "answer_index": 1,
+    "options": [
+      "1773",
+      "1774",
+      "1781",
+      "1784"
+    ],
+    "question": "कलकत्ता में सुप्रीम कोर्ट की स्थापना किस वर्ष की गई थी?"
+  },
+  {
+    "subject": "GK (भारतीय संविधान)",
+    "question_hi": "किस अधिनियम द्वारा कंपनी के राजनीतिक और वाणिज्यिक कार्यों को अलग कर दिया गया?",
+    "question_en": "By which act were the political and commercial functions of the company separated?",
+    "answer_index": 1,
+    "options": [
+      "रेगुलेटिंग एक्ट 1773 (Regulating Act 1773)",
+      "पिट्स इंडिया एक्ट 1784 (Pitt's India Act 1784)",
+      "चार्टर अधिनियम 1813 (Charter Act 1813)",
+      "चार्टर अधिनियम 1833 (Charter Act 1833)"
+    ],
+    "question": "किस अधिनियम द्वारा कंपनी के राजनीतिक और वाणिज्यिक कार्यों को अलग कर दिया गया?"
+  },
+  {
+    "subject": "GK (भारतीय संविधान)",
+    "question_hi": "भारत के प्रथम गवर्नर जनरल (1833) कौन थे?",
+    "question_en": "Who was the first Governor General of India (1833)?",
+    "answer_index": 1,
+    "options": [
+      "वारेन हेस्टिंग्स (Warren Hastings)",
+      "लॉर्ड विलियम बैटिंग (Lord William Bentinck)",
+      "लॉर्ड डलहौजी (Lord Dalhousie)",
+      "लॉर्ड कैनिंग (Lord Canning)"
+    ],
+    "question": "भारत के प्रथम गवर्नर जनरल (1833) कौन थे?"
+  },
+  {
+    "subject": "GK (भारतीय संविधान)",
+    "question_hi": "किस अधिनियम ने भारत में दास प्रथा (Slavery) को गैर-कानूनी घोषित किया था?",
+    "question_en": "Which act declared slavery illegal in India?",
+    "answer_index": 1,
+    "options": [
+      "चार्टर अधिनियम 1813 (Charter Act 1813)",
+      "चार्टर अधिनियम 1833 (Charter Act 1833)",
+      "भारत शासन अधिनियम 1858 (Government of India Act 1858)",
+      "परिषद अधिनियम 1861 (Council Act 1861)"
+    ],
+    "question": "किस अधिनियम ने भारत में दास प्रथा (Slavery) को गैर-कानूनी घोषित किया था?"
+  },
+  {
+    "subject": "GK (भारतीय संविधान)",
+    "question_hi": "भारत का अंतिम गवर्नर जनरल और प्रथम वायसराय कौन था?",
+    "question_en": "Who was the last Governor General and first Viceroy of India?",
+    "answer_index": 1,
+    "options": [
+      "लॉर्ड विलियम बैटिंग (Lord William Bentinck)",
+      "लॉर्ड कैनिंग (Lord Canning)",
+      "लॉर्ड माउंटबेटन (Lord Mountbatten)",
+      "लॉर्ड इरविन (Lord Irwin)"
+    ],
+    "question": "भारत का अंतिम गवर्नर जनरल और प्रथम वायसराय कौन था?"
+  },
+  {
+    "subject": "GK (भारतीय संविधान)",
+    "question_hi": "पोर्टफोलियो प्रणाली (विभागीय प्रणाली) की शुरुआत 1861 में किसने की थी?",
+    "question_en": "Who started the Portfolio System in 1861?",
+    "answer_index": 1,
+    "options": [
+      "लॉर्ड डलहौजी (Lord Dalhousie)",
+      "लॉर्ड कैनिंग (Lord Canning)",
+      "लॉर्ड मेयो (Lord Mayo)",
+      "लॉर्ड रिपन (Lord Ripon)"
+    ],
+    "question": "पोर्टफोलियो प्रणाली (विभागीय प्रणाली) की शुरुआत 1861 में किसने की थी?"
+  },
+  {
+    "subject": "GK (भारतीय संविधान)",
+    "question_hi": "'मार्ले-मिंटो सुधार' (Morley-Minto Reforms) किस अधिनियम को कहा जाता है?",
+    "question_en": "Which act is known as the 'Morley-Minto Reforms'?",
+    "answer_index": 2,
+    "options": [
+      "परिषद अधिनियम 1861 (Council Act 1861)",
+      "परिषद अधिनियम 1892 (Council Act 1892)",
+      "परिषद अधिनियम 1909 (Council Act 1909)",
+      "भारत शासन अधिनियम 1919 (Government of India Act 1919)"
+    ],
+    "question": "'मार्ले-मिंटो सुधार' (Morley-Minto Reforms) किस अधिनियम को कहा जाता है?"
+  },
+  {
+    "subject": "GK (भारतीय संविधान)",
+    "question_hi": "मुस्लिमों के लिए पृथक निर्वाचन (Separate Electorate) का प्रावधान कब किया गया?",
+    "question_en": "When was the provision of separate electorate for Muslims made?",
+    "answer_index": 1,
+    "options": [
+      "1892",
+      "1909",
+      "1919",
+      "1935"
+    ],
+    "question": "मुस्लिमों के लिए पृथक निर्वाचन (Separate Electorate) का प्रावधान कब किया गया?"
+  },
+  {
+    "subject": "GK (भारतीय संविधान)",
+    "question_hi": "'मांटेग्यू-चेम्सफोर्ड सुधार' किस अधिनियम को कहा जाता है?",
+    "question_en": "Which act is known as the 'Montagu-Chelmsford Reforms'?",
+    "answer_index": 1,
+    "options": [
+      "1909 अधिनियम",
+      "1919 अधिनियम",
+      "1935 अधिनियम",
+      "1947 अधिनियम"
+    ],
+    "question": "'मांटेग्यू-चेम्सफोर्ड सुधार' किस अधिनियम को कहा जाता है?"
+  },
+  {
+    "subject": "GK (भारतीय संविधान)",
+    "question_hi": "प्रांतों में द्वैध शासन (Dyarchy) प्रणाली कब लागू की गई थी?",
+    "question_en": "When was the Dyarchy system implemented in the provinces?",
+    "answer_index": 1,
+    "options": [
+      "1909",
+      "1919",
+      "1935",
+      "1947"
+    ],
+    "question": "प्रांतों में द्वैध शासन (Dyarchy) प्रणाली कब लागू की गई थी?"
+  },
+  {
+    "subject": "GK (भारतीय संविधान)",
+    "question_hi": "केंद्र में द्वैध शासन (Dyarchy) प्रणाली किस अधिनियम द्वारा स्थापित की गई?",
+    "question_en": "By which act was the Dyarchy system established at the Centre?",
+    "answer_index": 1,
+    "options": [
+      "1919",
+      "1935",
+      "1947",
+      "1950"
+    ],
+    "question": "केंद्र में द्वैध शासन (Dyarchy) प्रणाली किस अधिनियम द्वारा स्थापित की गई?"
+  },
+  {
+    "subject": "GK (भारतीय संविधान)",
+    "question_hi": "संघीय न्यायालय (Federal Court) की स्थापना किस वर्ष हुई थी?",
+    "question_en": "In which year was the Federal Court established?",
+    "answer_index": 1,
+    "options": [
+      "1935",
+      "1937",
+      "1947",
+      "1950"
+    ],
+    "question": "संघीय न्यायालय (Federal Court) की स्थापना किस वर्ष हुई थी?"
   }
 ]
